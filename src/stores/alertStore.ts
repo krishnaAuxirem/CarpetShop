@@ -11,6 +11,14 @@ export interface SavedFilter {
   createdAt: string;
 }
 
+export interface RestockAlert {
+  id: string;
+  productId: string;
+  productName: string;
+  productImage: string;
+  createdAt: string;
+}
+
 export interface PriceAlert {
   id: string;
   productId: string;
@@ -25,6 +33,7 @@ export interface PriceAlert {
 interface AlertStore {
   savedFilters: SavedFilter[];
   priceAlerts: PriceAlert[];
+  restockAlerts: RestockAlert[];
 
   // Saved Filters
   saveFilter: (filter: Omit<SavedFilter, "id" | "createdAt">) => void;
@@ -35,6 +44,11 @@ interface AlertStore {
   removePriceAlert: (id: string) => void;
   hasAlert: (productId: string) => boolean;
   getAlert: (productId: string) => PriceAlert | undefined;
+
+  // Restock Alerts
+  addRestockAlert: (alert: Omit<RestockAlert, "id" | "createdAt">) => void;
+  removeRestockAlert: (id: string) => void;
+  hasRestockAlert: (productId: string) => boolean;
 }
 
 export const useAlertStore = create<AlertStore>()(
@@ -42,6 +56,7 @@ export const useAlertStore = create<AlertStore>()(
     (set, get) => ({
       savedFilters: [],
       priceAlerts: [],
+      restockAlerts: [],
 
       saveFilter: (filter) => {
         const newFilter: SavedFilter = {
@@ -78,6 +93,24 @@ export const useAlertStore = create<AlertStore>()(
 
       getAlert: (productId) => {
         return get().priceAlerts.find(a => a.productId === productId);
+      },
+
+      addRestockAlert: (alert) => {
+        if (get().hasRestockAlert(alert.productId)) return;
+        const newAlert: RestockAlert = {
+          ...alert,
+          id: `rs_${Date.now()}`,
+          createdAt: new Date().toISOString(),
+        };
+        set(s => ({ restockAlerts: [newAlert, ...s.restockAlerts] }));
+      },
+
+      removeRestockAlert: (id) => {
+        set(s => ({ restockAlerts: s.restockAlerts.filter(a => a.id !== id) }));
+      },
+
+      hasRestockAlert: (productId) => {
+        return get().restockAlerts.some(a => a.productId === productId);
       },
     }),
     { name: "carpet-alerts" }

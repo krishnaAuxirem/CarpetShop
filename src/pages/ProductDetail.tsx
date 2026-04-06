@@ -9,6 +9,7 @@ import {
 import { useQAStore } from "@/stores/qaStore";
 import { ProductViewer360 } from "@/components/features/ProductViewer360";
 import { useCompareStore } from "@/stores/compareStore";
+import { useAlertStore } from "@/stores/alertStore";
 import { useProductStore } from "@/stores/productStore";
 import { useCartStore } from "@/stores/cartStore";
 import { useWishlistStore } from "@/stores/wishlistStore";
@@ -27,6 +28,7 @@ export const ProductDetail = () => {
   const navigate = useNavigate();
 
   const { addItem: addToCompare, removeItem: removeFromCompare, isInCompare } = useCompareStore();
+  const { addRestockAlert, removeRestockAlert, hasRestockAlert, restockAlerts } = useAlertStore();
   const { getOrdersByUser } = useOrderStore();
   const { getByProduct, addQuestion, addAnswer, voteQuestion, voteAnswer } = useQAStore();
   const product = products.find(p => p.id === id);
@@ -285,6 +287,35 @@ export const ProductDetail = () => {
             </div>
 
             <button onClick={handleBuyNow} className="w-full btn-accent mb-6">Buy Now</button>
+
+            {/* Out of stock restock alert */}
+            {product.stock === 0 && (
+              <div className="w-full mb-6">
+                {hasRestockAlert(product.id) ? (
+                  <button
+                    onClick={() => {
+                      const alert = restockAlerts.find(a => a.productId === product.id);
+                      if (alert) { removeRestockAlert(alert.id); toast.success("Restock alert removed."); }
+                    }}
+                    className="w-full flex items-center justify-center gap-2 py-3 rounded-xl border-2 border-amber-400 bg-amber-50 dark:bg-amber-900/10 text-amber-700 dark:text-amber-400 font-semibold text-sm hover:bg-amber-100 dark:hover:bg-amber-900/20 transition-colors"
+                  >
+                    <span className="text-base">🔔</span> Notified — Remove Alert
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => {
+                      if (!isAuthenticated) { navigate("/login"); return; }
+                      addRestockAlert({ productId: product.id, productName: product.name, productImage: product.images[0] });
+                      toast.success("We'll notify you when this product is back in stock!");
+                    }}
+                    className="w-full flex items-center justify-center gap-2 py-3 rounded-xl border-2 border-dashed border-amber-400 bg-amber-50/50 dark:bg-amber-900/10 text-amber-700 dark:text-amber-400 font-semibold text-sm hover:bg-amber-50 dark:hover:bg-amber-900/20 transition-colors"
+                  >
+                    <span className="text-base">🔔</span> Notify Me When Back in Stock
+                  </button>
+                )}
+                <p className="text-xs text-muted-foreground text-center mt-2">This product is currently out of stock</p>
+              </div>
+            )}
 
             {/* Guarantees */}
             <div className="grid grid-cols-3 gap-3">

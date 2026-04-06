@@ -1,10 +1,11 @@
+
 import { useState } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import {
   User, Package, Heart, Bell, LogOut, Settings, ShoppingBag,
-  ChevronRight, Edit3, Save, X, MapPin, Phone, Mail, Camera,
+  Edit3, Save, X, MapPin, Phone, Mail, Camera,
   Gift, Coins, Copy, Users, TrendingUp, Star, ArrowUpRight, ArrowDownRight,
-  FileText, BellRing, Trash2, Filter, SlidersHorizontal, Tag
+  FileText, BellRing, Trash2, Filter, SlidersHorizontal, Tag, Eye, Package2
 } from "lucide-react";
 import { useAuthStore } from "@/stores/authStore";
 import { useOrderStore } from "@/stores/orderStore";
@@ -12,6 +13,7 @@ import { useWishlistStore } from "@/stores/wishlistStore";
 import { useReferralStore } from "@/stores/referralStore";
 import { useAlertStore } from "@/stores/alertStore";
 import { ProductCard } from "@/components/features/ProductCard";
+import { InvoicePreviewModal } from "@/components/features/InvoicePreviewModal";
 import { toast } from "sonner";
 
 const SIDEBAR_ITEMS = [
@@ -47,9 +49,10 @@ export const CustomerDashboard = () => {
   const [form, setForm] = useState({ name: user?.name || "", phone: user?.phone || "", address: user?.address || "" });
 
   const { getPoints, getTransactions, getReferrals, getReferralCode, addReferral } = useReferralStore();
-  const { savedFilters, priceAlerts, removeFilter, removePriceAlert } = useAlertStore();
+  const { savedFilters, priceAlerts, restockAlerts, removeFilter, removePriceAlert, removeRestockAlert } = useAlertStore();
   const [referralEmail, setReferralEmail] = useState("");
   const [referralName, setReferralName] = useState("");
+  const [invoicePreviewOrderId, setInvoicePreviewOrderId] = useState<string | null>(null);
 
   if (!user) { navigate("/login"); return null; }
 
@@ -104,9 +107,9 @@ export const CustomerDashboard = () => {
                   <button key={id} onClick={() => setActive(id)} className={`sidebar-link w-full ${active === id ? "active" : ""}`}>
                     <Icon className="w-4 h-4" />
                     <span className="flex-1 text-left">{label}</span>
-                    {id === "alerts" && (priceAlerts.length + savedFilters.length) > 0 && (
+                    {id === "alerts" && (priceAlerts.length + savedFilters.length + restockAlerts.length) > 0 && (
                       <span className="ml-auto bg-amber-500 text-white text-xs w-5 h-5 rounded-full flex items-center justify-center font-bold">
-                        {priceAlerts.length + savedFilters.length}
+                        {priceAlerts.length + savedFilters.length + restockAlerts.length}
                       </span>
                     )}
                   </button>
@@ -224,6 +227,12 @@ export const CustomerDashboard = () => {
                       <div className="flex flex-wrap gap-2">
                         <Link to={`/order-tracking?order=${order.id}`} className="text-xs btn-secondary py-1.5 px-3">Track Order</Link>
                         <button
+                          onClick={() => setInvoicePreviewOrderId(order.id)}
+                          className="text-xs flex items-center gap-1.5 border border-border rounded-lg py-1.5 px-3 hover:bg-muted transition-colors"
+                        >
+                          <Eye className="w-3.5 h-3.5" /> Preview
+                        </button>
+                        <button
                           onClick={() => { window.open(`/invoice/${order.id}`, "_blank"); }}
                           className="text-xs flex items-center gap-1.5 border border-border rounded-lg py-1.5 px-3 hover:bg-muted transition-colors"
                         >
@@ -243,6 +252,49 @@ export const CustomerDashboard = () => {
             {active === "alerts" && (
               <div className="animate-fade-in space-y-6">
                 <h2 className="font-heading text-2xl font-bold">My Alerts</h2>
+
+                {/* Restock Alerts */}
+                <div className="bg-card border border-border rounded-2xl overflow-hidden">
+                  <div className="p-5 border-b border-border flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Package2 className="w-5 h-5 text-purple-500" />
+                      <h3 className="font-heading font-semibold">Restock Alerts</h3>
+                    </div>
+                    <span className="badge bg-purple-100 text-purple-700 dark:bg-purple-900/20 dark:text-purple-400">{restockAlerts.length} active</span>
+                  </div>
+                  {restockAlerts.length === 0 ? (
+                    <div className="p-10 text-center">
+                      <Package2 className="w-12 h-12 text-muted-foreground mx-auto mb-3" />
+                      <p className="text-muted-foreground text-sm">No restock alerts yet</p>
+                      <p className="text-xs text-muted-foreground mt-1">On any out-of-stock product page, click "Notify me when back in stock"</p>
+                      <Link to="/shop" className="btn-primary mt-4 text-sm inline-flex">Browse Products</Link>
+                    </div>
+                  ) : (
+                    <div className="divide-y divide-border">
+                      {restockAlerts.map(alert => (
+                        <div key={alert.id} className="flex items-center gap-4 p-4 hover:bg-muted/40 transition-colors">
+                          <img src={alert.productImage} alt={alert.productName} className="w-14 h-14 rounded-xl object-cover border border-border shrink-0" />
+                          <div className="flex-1 min-w-0">
+                            <p className="font-semibold text-sm text-foreground line-clamp-1">{alert.productName}</p>
+                            <span className="inline-flex items-center gap-1 text-xs text-red-600 dark:text-red-400 font-medium mt-0.5">
+                              <span className="w-1.5 h-1.5 bg-red-500 rounded-full" /> Out of Stock
+                            </span>
+                            <p className="text-xs text-muted-foreground mt-0.5">Set on {new Date(alert.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}</p>
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0">
+                            <Link to={`/product/${alert.productId}`} className="text-xs text-primary hover:underline">View</Link>
+                            <button
+                              onClick={() => { removeRestockAlert(alert.id); toast.success("Restock alert removed"); }}
+                              className="w-8 h-8 flex items-center justify-center border border-red-200 text-red-500 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
 
                 {/* Price Drop Alerts */}
                 <div className="bg-card border border-border rounded-2xl overflow-hidden">
@@ -549,6 +601,11 @@ export const CustomerDashboard = () => {
           </div>
         </div>
       </div>
+
+      {/* Invoice Preview Modal */}
+      {invoicePreviewOrderId && (
+        <InvoicePreviewModal orderId={invoicePreviewOrderId} onClose={() => setInvoicePreviewOrderId(null)} />
+      )}
     </div>
   );
 };

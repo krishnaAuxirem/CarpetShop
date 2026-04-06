@@ -1,6 +1,8 @@
 import { useParams, Link } from "react-router-dom";
-import { CheckCircle2, Package, Truck, MapPin, ArrowRight, Download } from "lucide-react";
+import { useState } from "react";
+import { CheckCircle2, Package, Truck, MapPin, ArrowRight, Download, Eye } from "lucide-react";
 import { useOrderStore } from "@/stores/orderStore";
+import { InvoicePreviewModal } from "@/components/features/InvoicePreviewModal";
 
 export const OrderConfirmation = () => {
   const { id } = useParams();
@@ -17,6 +19,8 @@ export const OrderConfirmation = () => {
       </div>
     );
   }
+
+  const [showInvoicePreview, setShowInvoicePreview] = useState(false);
 
   return (
     <div className="page-transition pt-16 min-h-screen bg-muted/30">
@@ -124,6 +128,12 @@ export const OrderConfirmation = () => {
             Continue Shopping <ArrowRight className="w-4 h-4" />
           </Link>
           <button
+            onClick={() => setShowInvoicePreview(true)}
+            className="flex items-center justify-center gap-2 px-4 py-3 border border-border rounded-lg hover:bg-muted transition-colors text-sm font-medium"
+          >
+            <Eye className="w-4 h-4" /> Preview Invoice
+          </button>
+          <button
             onClick={() => { window.open(`/invoice/${order.id}`, "_blank"); }}
             className="flex items-center justify-center gap-2 px-4 py-3 border border-border rounded-lg hover:bg-muted transition-colors text-sm font-medium"
           >
@@ -131,6 +141,11 @@ export const OrderConfirmation = () => {
           </button>
         </div>
       </div>
+
+      {/* Invoice Preview Modal */}
+      {showInvoicePreview && (
+        <InvoicePreviewModal orderId={order.id} onClose={() => setShowInvoicePreview(false)} />
+      )}
     </div>
   );
 };
