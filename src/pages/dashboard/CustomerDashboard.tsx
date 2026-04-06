@@ -3,12 +3,14 @@ import { Link, useNavigate, useLocation } from "react-router-dom";
 import {
   User, Package, Heart, Bell, LogOut, Settings, ShoppingBag,
   ChevronRight, Edit3, Save, X, MapPin, Phone, Mail, Camera,
-  Gift, Coins, Copy, Users, TrendingUp, Star, ArrowUpRight, ArrowDownRight
+  Gift, Coins, Copy, Users, TrendingUp, Star, ArrowUpRight, ArrowDownRight,
+  FileText, BellRing, Trash2, Filter, SlidersHorizontal, Tag
 } from "lucide-react";
 import { useAuthStore } from "@/stores/authStore";
 import { useOrderStore } from "@/stores/orderStore";
 import { useWishlistStore } from "@/stores/wishlistStore";
 import { useReferralStore } from "@/stores/referralStore";
+import { useAlertStore } from "@/stores/alertStore";
 import { ProductCard } from "@/components/features/ProductCard";
 import { toast } from "sonner";
 
@@ -17,6 +19,7 @@ const SIDEBAR_ITEMS = [
   { id: "orders", label: "Order History", icon: Package },
   { id: "current-orders", label: "Current Orders", icon: ShoppingBag },
   { id: "wishlist", label: "My Wishlist", icon: Heart },
+  { id: "alerts", label: "My Alerts", icon: BellRing },
   { id: "referral", label: "Rewards & Referrals", icon: Gift },
   { id: "notifications", label: "Notifications", icon: Bell },
   { id: "settings", label: "Settings", icon: Settings },
@@ -44,6 +47,7 @@ export const CustomerDashboard = () => {
   const [form, setForm] = useState({ name: user?.name || "", phone: user?.phone || "", address: user?.address || "" });
 
   const { getPoints, getTransactions, getReferrals, getReferralCode, addReferral } = useReferralStore();
+  const { savedFilters, priceAlerts, removeFilter, removePriceAlert } = useAlertStore();
   const [referralEmail, setReferralEmail] = useState("");
   const [referralName, setReferralName] = useState("");
 
@@ -98,7 +102,13 @@ export const CustomerDashboard = () => {
               <nav className="space-y-0.5">
                 {SIDEBAR_ITEMS.map(({ id, label, icon: Icon }) => (
                   <button key={id} onClick={() => setActive(id)} className={`sidebar-link w-full ${active === id ? "active" : ""}`}>
-                    <Icon className="w-4 h-4" />{label}
+                    <Icon className="w-4 h-4" />
+                    <span className="flex-1 text-left">{label}</span>
+                    {id === "alerts" && (priceAlerts.length + savedFilters.length) > 0 && (
+                      <span className="ml-auto bg-amber-500 text-white text-xs w-5 h-5 rounded-full flex items-center justify-center font-bold">
+                        {priceAlerts.length + savedFilters.length}
+                      </span>
+                    )}
                   </button>
                 ))}
                 <button onClick={handleLogout} className="sidebar-link w-full text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-600">
@@ -213,6 +223,12 @@ export const CustomerDashboard = () => {
                       </div>
                       <div className="flex flex-wrap gap-2">
                         <Link to={`/order-tracking?order=${order.id}`} className="text-xs btn-secondary py-1.5 px-3">Track Order</Link>
+                        <button
+                          onClick={() => { window.open(`/invoice/${order.id}`, "_blank"); }}
+                          className="text-xs flex items-center gap-1.5 border border-border rounded-lg py-1.5 px-3 hover:bg-muted transition-colors"
+                        >
+                          <FileText className="w-3.5 h-3.5" /> Invoice
+                        </button>
                         {!["delivered", "cancelled"].includes(order.status) && (
                           <button onClick={() => { cancelOrder(order.id); toast.success("Order cancelled"); }} className="text-xs text-red-500 border border-red-200 rounded-lg py-1.5 px-3 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors">Cancel Order</button>
                         )}
@@ -220,6 +236,119 @@ export const CustomerDashboard = () => {
                     </div>
                   ))
                 )}
+              </div>
+            )}
+
+            {/* My Alerts */}
+            {active === "alerts" && (
+              <div className="animate-fade-in space-y-6">
+                <h2 className="font-heading text-2xl font-bold">My Alerts</h2>
+
+                {/* Price Drop Alerts */}
+                <div className="bg-card border border-border rounded-2xl overflow-hidden">
+                  <div className="p-5 border-b border-border flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Bell className="w-5 h-5 text-amber-500" />
+                      <h3 className="font-heading font-semibold">Price Drop Alerts</h3>
+                    </div>
+                    <span className="badge bg-amber-100 text-amber-700 dark:bg-amber-900/20 dark:text-amber-400">{priceAlerts.length} active</span>
+                  </div>
+                  {priceAlerts.length === 0 ? (
+                    <div className="p-10 text-center">
+                      <Bell className="w-12 h-12 text-muted-foreground mx-auto mb-3" />
+                      <p className="text-muted-foreground text-sm">No price alerts yet</p>
+                      <p className="text-xs text-muted-foreground mt-1">Click the 🔔 bell icon on any product card to set a price drop alert</p>
+                      <Link to="/shop" className="btn-primary mt-4 text-sm inline-flex">Browse Products</Link>
+                    </div>
+                  ) : (
+                    <div className="divide-y divide-border">
+                      {priceAlerts.map(alert => (
+                        <div key={alert.id} className="flex items-center gap-4 p-4 hover:bg-muted/40 transition-colors">
+                          <img src={alert.productImage} alt={alert.productName} className="w-14 h-14 rounded-xl object-cover border border-border shrink-0" />
+                          <div className="flex-1 min-w-0">
+                            <p className="font-semibold text-sm text-foreground line-clamp-1">{alert.productName}</p>
+                            <div className="flex items-center gap-2 mt-1 flex-wrap">
+                              <span className="text-xs text-muted-foreground">Current: <strong className="text-foreground">₹{alert.currentPrice.toLocaleString("en-IN")}</strong></span>
+                              <span className="text-xs text-amber-600 dark:text-amber-400 font-medium">Alert at: ₹{alert.targetPrice.toLocaleString("en-IN")} or below</span>
+                            </div>
+                            <p className="text-xs text-muted-foreground mt-0.5">Set on {new Date(alert.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}</p>
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0">
+                            <Link to={`/product/${alert.productId}`} className="text-xs text-primary hover:underline">View</Link>
+                            <button
+                              onClick={() => { removePriceAlert(alert.id); toast.success("Alert removed"); }}
+                              className="w-8 h-8 flex items-center justify-center border border-red-200 text-red-500 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Saved Filters */}
+                <div className="bg-card border border-border rounded-2xl overflow-hidden">
+                  <div className="p-5 border-b border-border flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Filter className="w-5 h-5 text-primary" />
+                      <h3 className="font-heading font-semibold">Saved Shop Filters</h3>
+                    </div>
+                    <span className="badge bg-primary/10 text-primary">{savedFilters.length} saved</span>
+                  </div>
+                  {savedFilters.length === 0 ? (
+                    <div className="p-10 text-center">
+                      <SlidersHorizontal className="w-12 h-12 text-muted-foreground mx-auto mb-3" />
+                      <p className="text-muted-foreground text-sm">No saved filters yet</p>
+                      <p className="text-xs text-muted-foreground mt-1">Use the "Save Filters" button in the Shop page to save your favourite filter combinations</p>
+                      <Link to="/shop" className="btn-primary mt-4 text-sm inline-flex">Go to Shop</Link>
+                    </div>
+                  ) : (
+                    <div className="divide-y divide-border">
+                      {savedFilters.map(filter => (
+                        <div key={filter.id} className="flex items-start gap-4 p-4 hover:bg-muted/40 transition-colors">
+                          <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center shrink-0">
+                            <Tag className="w-5 h-5 text-primary" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-semibold text-sm text-foreground">{filter.name}</p>
+                            <div className="flex flex-wrap gap-1.5 mt-1.5">
+                              {filter.category && (
+                                <span className="text-[10px] bg-muted border border-border rounded-full px-2 py-0.5 text-muted-foreground">Category: {filter.category}</span>
+                              )}
+                              {filter.materials.length > 0 && (
+                                <span className="text-[10px] bg-muted border border-border rounded-full px-2 py-0.5 text-muted-foreground">
+                                  Materials: {filter.materials.join(", ")}
+                                </span>
+                              )}
+                              {(filter.priceMin > 0 || filter.priceMax < 200000) && (
+                                <span className="text-[10px] bg-muted border border-border rounded-full px-2 py-0.5 text-muted-foreground">
+                                  ₹{filter.priceMin.toLocaleString("en-IN")} – ₹{filter.priceMax.toLocaleString("en-IN")}
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-xs text-muted-foreground mt-1">Saved {new Date(filter.createdAt).toLocaleDateString("en-IN")}</p>
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0">
+                            <Link
+                              to={`/shop?category=${encodeURIComponent(filter.category)}&material=${filter.materials[0] || ""}`}
+                              className="text-xs btn-secondary py-1 px-2.5"
+                            >
+                              Apply
+                            </Link>
+                            <button
+                              onClick={() => { removeFilter(filter.id); toast.success("Filter removed"); }}
+                              className="w-8 h-8 flex items-center justify-center border border-red-200 text-red-500 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
             )}
 

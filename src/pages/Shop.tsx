@@ -1,9 +1,11 @@
 import { useState, useEffect, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
-import { Filter, Search, SlidersHorizontal, X, Grid, List, ChevronDown, Download } from "lucide-react";
+import { Filter, Search, SlidersHorizontal, X, Grid, List, ChevronDown, Download, Bookmark, Bell } from "lucide-react";
 import { toast } from "sonner";
 import { ProductCard } from "@/components/features/ProductCard";
 import { useProductStore } from "@/stores/productStore";
+import { useAlertStore } from "@/stores/alertStore";
+import { useAuthStore } from "@/stores/authStore";
 import { CATEGORIES, MATERIALS, CARPET_COLORS } from "@/constants/data";
 
 const SORT_OPTIONS = [
@@ -27,7 +29,26 @@ export const Shop = () => {
   const [showFilters, setShowFilters] = useState(false);
   const [view, setView] = useState<"grid" | "list">("grid");
   const [page, setPage] = useState(1);
+  const [saveFilterName, setSaveFilterName] = useState("");
+  const [showSaveModal, setShowSaveModal] = useState(false);
   const PER_PAGE = 8;
+  const { saveFilter } = useAlertStore();
+  const { isAuthenticated } = useAuthStore();
+
+  const handleSaveFilter = () => {
+    if (!isAuthenticated) { toast.error("Login to save filters"); return; }
+    if (!saveFilterName.trim()) { toast.error("Please enter a name for this filter"); return; }
+    saveFilter({
+      name: saveFilterName.trim(),
+      category,
+      materials: selectedMaterials,
+      priceMin: priceRange[0],
+      priceMax: priceRange[1],
+    });
+    setSaveFilterName("");
+    setShowSaveModal(false);
+    toast.success(`Filter "${saveFilterName}" saved! View in My Alerts dashboard.`);
+  };
 
   useEffect(() => {
     const cat = searchParams.get("category") || "";
@@ -118,11 +139,20 @@ export const Shop = () => {
               <div className="bg-card border border-border rounded-2xl p-5 sticky top-20">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="font-heading font-semibold">Filters</h3>
+                  <div className="flex items-center gap-2">
                   {hasActiveFilters && (
                     <button onClick={clearFilters} className="text-xs text-primary flex items-center gap-1">
-                      <X className="w-3 h-3" /> Clear All
+                      <X className="w-3 h-3" /> Clear
                     </button>
                   )}
+                  <button
+                    onClick={() => setShowSaveModal(true)}
+                    title="Save current filters"
+                    className="w-6 h-6 flex items-center justify-center text-muted-foreground hover:text-primary transition-colors"
+                  >
+                    <Bookmark className="w-4 h-4" />
+                  </button>
+                </div>
                 </div>
 
                 {/* Price Range */}
@@ -211,6 +241,45 @@ export const Shop = () => {
           </div>
         </div>
       </div>
+
+      {/* Save Filter Modal */}
+      {showSaveModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={() => setShowSaveModal(false)}>
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
+          <div className="relative bg-card border border-border rounded-2xl shadow-2xl p-6 w-full max-w-sm animate-scale-in" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center gap-2 mb-4">
+              <Bookmark className="w-5 h-5 text-primary" />
+              <h3 className="font-heading font-semibold text-lg">Save Current Filters</h3>
+            </div>
+            <p className="text-sm text-muted-foreground mb-4">Name this filter combination so you can apply it quickly later from your dashboard.</p>
+            {/* Summary of active filters */}
+            <div className="bg-muted rounded-xl p-3 mb-4 space-y-1 text-xs text-muted-foreground">
+              {category && <p>Category: <strong className="text-foreground">{category}</strong></p>}
+              {selectedMaterials.length > 0 && <p>Materials: <strong className="text-foreground">{selectedMaterials.join(", ")}</strong></p>}
+              {(priceRange[0] > 0 || priceRange[1] < 200000) && <p>Price: <strong className="text-foreground">₹{priceRange[0].toLocaleString("en-IN")} – ₹{priceRange[1].toLocaleString("en-IN")}</strong></p>}
+              {!category && !selectedMaterials.length && priceRange[0] === 0 && priceRange[1] === 200000 && (
+                <p className="text-muted-foreground italic">No filters active — saving as default view</p>
+              )}
+            </div>
+            <input
+              value={saveFilterName}
+              onChange={e => setSaveFilterName(e.target.value)}
+              placeholder="e.g. Wool carpets under ₹20K"
+              className="input-field mb-4"
+              autoFocus
+              onKeyDown={e => e.key === "Enter" && handleSaveFilter()}
+            />
+            <div className="flex gap-3">
+              <button onClick={handleSaveFilter} className="btn-primary flex-1 justify-center">
+                <Bookmark className="w-4 h-4" /> Save Filter
+              </button>
+              <button onClick={() => setShowSaveModal(false)} className="btn-secondary">
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -123,7 +123,10 @@ export const OrderConfirmation = () => {
           <Link to="/shop" className="btn-secondary flex-1 justify-center">
             Continue Shopping <ArrowRight className="w-4 h-4" />
           </Link>
-          <button onClick={() => window.print()} className="flex items-center justify-center gap-2 px-4 py-3 border border-border rounded-lg hover:bg-muted transition-colors text-sm font-medium">
+          <button
+            onClick={() => { window.open(`/invoice/${order.id}`, "_blank"); }}
+            className="flex items-center justify-center gap-2 px-4 py-3 border border-border rounded-lg hover:bg-muted transition-colors text-sm font-medium"
+          >
             <Download className="w-4 h-4" /> Invoice
           </button>
         </div>

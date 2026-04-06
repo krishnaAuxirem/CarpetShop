@@ -36,6 +36,8 @@ import { ARCameraView } from "@/pages/ARCameraView";
 import { CatalogPDF } from "@/pages/CatalogPDF";
 import { ChatWidget } from "@/components/features/ChatWidget";
 import { CompareBar } from "@/components/features/CompareBar";
+import { AnnouncementBanner } from "@/components/layout/AnnouncementBanner";
+import { InvoicePage } from "@/pages/InvoicePage";
 
 const ProtectedRoute = ({ children, requiredRole }: { children: React.ReactNode; requiredRole?: string }) => {
   const { isAuthenticated, user } = useAuthStore();
@@ -53,6 +55,7 @@ const LoadingSpinner = () => (
 // Full app layout (with navbar + footer)
 const AppLayout = ({ children }: { children: React.ReactNode }) => (
   <>
+    <AnnouncementBanner />
     <Navbar />
     <main className="min-h-screen pb-16">{children}</main>
     <Footer />
@@ -96,6 +99,7 @@ function App() {
         <Route path="/room-calculator" element={<AppLayout><RoomCalculator /></AppLayout>} />
         <Route path="/ar-camera" element={<ARCameraView />} />
         <Route path="/catalog-pdf" element={<CatalogPDF />} />
+        <Route path="/invoice/:id" element={<InvoicePage />} />
         <Route path="/wishlist/shared/:shareId" element={<AppLayout><Wishlist /></AppLayout>} />
 
         {/* Protected routes */}
