@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import {
   ArrowRight, Shield, Truck, Award, HeadphonesIcon,
-  Star, ChevronRight, Sparkles, Tag, Mail, Phone
+  Star, ChevronRight, Sparkles, Tag, Mail, Phone, Zap, Timer, ShoppingBag
 } from "lucide-react";
 import { HeroSlider } from "@/components/features/HeroSlider";
 import { ProductCard } from "@/components/features/ProductCard";
@@ -30,17 +30,60 @@ const AnimatedSection = ({ children, className = "" }: { children: React.ReactNo
   );
 };
 
+// Flash sale: 3 hours from page load
+const FLASH_SALE_DURATION_MS = 3 * 60 * 60 * 1000;
+
+function useFlashSaleTimer() {
+  const [timeLeft, setTimeLeft] = useState<{ h: number; m: number; s: number }>({ h: 2, m: 59, s: 59 });
+  const [expired, setExpired] = useState(false);
+  const endRef = useRef<number>(Date.now() + FLASH_SALE_DURATION_MS);
+
+  useEffect(() => {
+    const tick = () => {
+      const diff = endRef.current - Date.now();
+      if (diff <= 0) { setExpired(true); return; }
+      setTimeLeft({
+        h: Math.floor(diff / 3600000),
+        m: Math.floor((diff % 3600000) / 60000),
+        s: Math.floor((diff % 60000) / 1000),
+      });
+    };
+    tick();
+    const t = setInterval(tick, 1000);
+    return () => clearInterval(t);
+  }, []);
+
+  return { timeLeft, expired };
+}
+
+// Flash sale products (discount >= 15%)
+const FLASH_PRODUCTS = PRODUCTS.filter(p => (p.discount || 0) >= 10).slice(0, 6).map((p, i) => ({
+  ...p,
+  flashDiscount: Math.min(60, (p.discount || 10) + 5 + i * 3),
+  stockLeft: Math.max(1, Math.floor(Math.random() * 8) + 1),
+  totalStock: 12,
+}));
+
 export const Home = () => {
   const [email, setEmail] = useState("");
   const [testimonialIdx, setTestimonialIdx] = useState(0);
   const featured = PRODUCTS.filter(p => p.isFeatured);
   const bestSellers = PRODUCTS.filter(p => p.isBestSeller);
   const blogPosts = BLOG_POSTS.filter(p => p.isPublished).slice(0, 3);
+  const { timeLeft, expired } = useFlashSaleTimer();
+  const navigate = useNavigate();
 
   useEffect(() => {
     const t = setInterval(() => setTestimonialIdx(i => (i + 1) % TESTIMONIALS.length), 4000);
     return () => clearInterval(t);
   }, []);
+
+  useEffect(() => {
+    if (expired) {
+      toast.info("Flash Sale has ended! Redirecting to shop...");
+      setTimeout(() => navigate("/shop"), 2500);
+    }
+  }, [expired, navigate]);
 
   const handleSubscribe = (e: React.FormEvent) => {
     e.preventDefault();
@@ -173,6 +216,102 @@ export const Home = () => {
             </div>
           </div>
         </AnimatedSection>
+      </section>
+
+      {/* Flash Sale */}
+      <section className="py-16 bg-gradient-to-br from-gray-950 via-red-950 to-gray-950 relative overflow-hidden">
+        {/* Background shimmer */}
+        <div className="absolute inset-0 opacity-10">
+          <div className="absolute inset-0" style={{ backgroundImage: "repeating-linear-gradient(45deg, transparent, transparent 20px, rgba(212,175,55,0.15) 20px, rgba(212,175,55,0.15) 21px)" }} />
+        </div>
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          {/* Header */}
+          <AnimatedSection className="flex flex-col sm:flex-row items-center justify-between gap-4 mb-10">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 bg-red-500 rounded-xl flex items-center justify-center animate-pulse">
+                <Zap className="w-6 h-6 text-white fill-white" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h2 className="font-heading text-3xl font-bold text-white">Flash Sale</h2>
+                  <span className="badge bg-red-500 text-white text-xs animate-bounce">LIVE</span>
+                </div>
+                <p className="text-white/60 text-sm">Limited-time deals — grab them before they're gone!</p>
+              </div>
+            </div>
+            {/* Countdown */}
+            {!expired ? (
+              <div className="flex items-center gap-3">
+                <Timer className="w-5 h-5 text-amber-400" />
+                <p className="text-amber-400 text-sm font-medium">Ends in:</p>
+                <div className="flex gap-1.5">
+                  {[
+                    { v: timeLeft.h, l: "H" },
+                    { v: timeLeft.m, l: "M" },
+                    { v: timeLeft.s, l: "S" },
+                  ].map(({ v, l }, i) => (
+                    <div key={l}>
+                      <div className="bg-white/10 border border-white/20 rounded-lg px-2.5 py-1.5 min-w-[44px] text-center">
+                        <p className="font-heading font-bold text-white text-xl leading-none">{String(v).padStart(2, "0")}</p>
+                        <p className="text-white/40 text-[10px]">{l}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <div className="text-amber-400 text-sm font-semibold">Sale Ended — Redirecting...</div>
+            )}
+          </AnimatedSection>
+
+          {/* Product grid */}
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
+            {FLASH_PRODUCTS.map((product, i) => (
+              <AnimatedSection key={product.id} style={{ transitionDelay: `${i * 60}ms` } as React.CSSProperties}>
+                <Link to={`/product/${product.id}`} className="group block bg-white/5 border border-white/10 rounded-2xl overflow-hidden hover:border-amber-400/40 hover:bg-white/10 transition-all duration-300">
+                  <div className="relative aspect-square overflow-hidden">
+                    <img
+                      src={product.images[0]}
+                      alt={product.name}
+                      className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                    />
+                    {/* Discount badge */}
+                    <div className="absolute top-2 left-2 bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded-full">
+                      -{product.flashDiscount}%
+                    </div>
+                    {/* Units left badge */}
+                    {product.stockLeft <= 3 && (
+                      <div className="absolute bottom-2 left-2 right-2 bg-black/70 backdrop-blur-sm text-red-400 text-[10px] font-bold px-1.5 py-0.5 rounded-md text-center">
+                        Only {product.stockLeft} left!
+                      </div>
+                    )}
+                  </div>
+                  <div className="p-2.5">
+                    <p className="text-white text-xs font-semibold line-clamp-1 mb-1">{product.name}</p>
+                    <div className="flex items-center gap-1.5 mb-2">
+                      <span className="text-amber-400 font-bold text-sm">₹{Math.round(product.price * (1 - product.flashDiscount / 100)).toLocaleString("en-IN")}</span>
+                      <span className="text-white/40 text-[10px] line-through">₹{product.price.toLocaleString("en-IN")}</span>
+                    </div>
+                    {/* Stock progress bar */}
+                    <div className="relative h-1.5 bg-white/10 rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-gradient-to-r from-amber-400 to-red-500 rounded-full transition-all"
+                        style={{ width: `${(product.stockLeft / product.totalStock) * 100}%` }}
+                      />
+                    </div>
+                    <p className="text-white/40 text-[10px] mt-1">{product.stockLeft}/{product.totalStock} remaining</p>
+                  </div>
+                </Link>
+              </AnimatedSection>
+            ))}
+          </div>
+
+          <div className="text-center">
+            <Link to="/shop?sale=true" className="inline-flex items-center gap-2 px-8 py-3 bg-amber-400 text-gray-900 rounded-xl font-bold hover:bg-amber-300 transition-colors">
+              <ShoppingBag className="w-4 h-4" /> Shop All Flash Deals <ArrowRight className="w-4 h-4" />
+            </Link>
+          </div>
+        </div>
       </section>
 
       {/* Best Sellers */}

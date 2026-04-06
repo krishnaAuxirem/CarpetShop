@@ -33,6 +33,7 @@ import { BulkOrder } from "@/pages/BulkOrder";
 import { Compare } from "@/pages/Compare";
 import { RoomCalculator } from "@/pages/RoomCalculator";
 import { ARCameraView } from "@/pages/ARCameraView";
+import { CatalogPDF } from "@/pages/CatalogPDF";
 import { ChatWidget } from "@/components/features/ChatWidget";
 import { CompareBar } from "@/components/features/CompareBar";
 
@@ -94,6 +95,7 @@ function App() {
         <Route path="/compare" element={<AppLayout><Compare /></AppLayout>} />
         <Route path="/room-calculator" element={<AppLayout><RoomCalculator /></AppLayout>} />
         <Route path="/ar-camera" element={<ARCameraView />} />
+        <Route path="/catalog-pdf" element={<CatalogPDF />} />
         <Route path="/wishlist/shared/:shareId" element={<AppLayout><Wishlist /></AppLayout>} />
 
         {/* Protected routes */}

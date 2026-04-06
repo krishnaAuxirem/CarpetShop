@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
-import { Filter, Search, SlidersHorizontal, X, Grid, List, ChevronDown } from "lucide-react";
+import { Filter, Search, SlidersHorizontal, X, Grid, List, ChevronDown, Download } from "lucide-react";
+import { toast } from "sonner";
 import { ProductCard } from "@/components/features/ProductCard";
 import { useProductStore } from "@/stores/productStore";
 import { CATEGORIES, MATERIALS, CARPET_COLORS } from "@/constants/data";
@@ -176,6 +177,12 @@ export const Shop = () => {
               <p className="text-sm text-muted-foreground">
                 Showing <strong className="text-foreground">{paginated.length}</strong> of <strong className="text-foreground">{filtered.length}</strong> products
               </p>
+              <button
+                onClick={() => { window.open("/catalog-pdf", "_blank"); toast.success("Opening print-ready catalog..."); }}
+                className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-primary border border-border hover:border-primary/50 px-3 py-1.5 rounded-lg transition-all"
+              >
+                <Download className="w-3.5 h-3.5" /> Download Catalog
+              </button>
             </div>
 
             {filtered.length === 0 ? (

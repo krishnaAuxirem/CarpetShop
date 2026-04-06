@@ -61,22 +61,8 @@ export const BulkOrder = () => {
   };
 
   const generatePDF = () => {
-    // Simulate PDF generation/download
-    const content = PRODUCTS.map(p =>
-      `${p.name} | ${p.category} | ${p.material} | MRP: ₹${p.price.toLocaleString("en-IN")}`
-    ).join("\n");
-    const blob = new Blob([
-      `CarpetShop – Product Catalog\n${"=".repeat(50)}\n\n${content}\n\n` +
-      `Bulk Pricing Tiers:\n${PRICING_TIERS.map(t => `${t.qty}: ${t.discount}% off`).join("\n")}\n\n` +
-      `Contact: bulk@carpetshop.in | +91 1800 123 4567`
-    ], { type: "text/plain" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "CarpetShop-Product-Catalog.txt";
-    a.click();
-    URL.revokeObjectURL(url);
-    toast.success("Product catalog downloaded!");
+    window.open("/catalog-pdf", "_blank");
+    toast.success("Opening print-ready product catalog...");
   };
 
   const estimatedDiscount = () => {

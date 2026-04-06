@@ -3,11 +3,12 @@ import { Link, useNavigate } from "react-router-dom";
 import {
   Package, Plus, Edit3, Trash2, BarChart2, ShoppingBag, LogOut,
   TrendingUp, DollarSign, Eye, Star, Save, X, Users,
-  ArrowUp, ArrowDown, Award
+  ArrowUp, ArrowDown, Award, MessageCircle, Bell, Send, ChevronDown, ChevronUp, Check
 } from "lucide-react";
 import { useAuthStore } from "@/stores/authStore";
 import { useProductStore } from "@/stores/productStore";
 import { useOrderStore } from "@/stores/orderStore";
+import { useQAStore } from "@/stores/qaStore";
 import { CATEGORIES, MATERIALS, CARPET_COLORS, CARPET_SIZES } from "@/constants/data";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -21,6 +22,7 @@ const SIDEBAR_ITEMS = [
   { id: "add-product", label: "Add Product", icon: Plus },
   { id: "orders", label: "Orders", icon: ShoppingBag },
   { id: "analytics", label: "Sales Analytics", icon: TrendingUp },
+  { id: "qa-inbox", label: "Q&A Inbox", icon: MessageCircle },
 ];
 
 const CHART_COLORS = ["#8B4513", "#D4AF37", "#3E2723", "#6B3A2A", "#C09060", "#5A2D0C"];
@@ -75,11 +77,35 @@ export const SellerDashboard = () => {
 
   if (!user || user.role !== "seller") { navigate("/login"); return null; }
 
+  const { questions, addAnswer } = useQAStore();
+  const [qaAnswers, setQaAnswers] = useState<Record<string, string>>({});
+  const [expandedQ, setExpandedQ] = useState<string | null>(null);
+
   const myProducts = products.filter(p => p.sellerId === user.id);
   const allOrders = getAllOrders();
   const myOrders = allOrders.filter(o => o.items.some(i => myProducts.find(p => p.id === i.productId)));
   const totalRevenue = myOrders.filter(o => o.paymentStatus === "paid").reduce((s, o) => s + o.totalAmount, 0);
   const avgRating = myProducts.length ? (myProducts.reduce((s, p) => s + p.rating, 0) / myProducts.length) : 0;
+
+  // Unanswered questions on seller's products
+  const myProductIds = new Set(myProducts.map(p => p.id));
+  const allMyQA = questions.filter(q => myProductIds.has(q.productId));
+  const unansweredQA = allMyQA.filter(q => !q.isAnswered);
+  const answeredQA = allMyQA.filter(q => q.isAnswered);
+
+  const handleQAReply = (questionId: string) => {
+    const text = qaAnswers[questionId];
+    if (!text?.trim()) return;
+    addAnswer(questionId, {
+      userId: user.id,
+      userName: user.name,
+      userRole: "seller",
+      text,
+      isSellerReply: true,
+    });
+    setQaAnswers(a => ({ ...a, [questionId]: "" }));
+    toast.success("Reply sent! Customer will see your answer.");
+  };
 
   // Analytics data derived from myProducts
   const topProducts = [...myProducts]
@@ -133,6 +159,8 @@ export const SellerDashboard = () => {
   const toggleSize = (s: string) => setForm(f => ({ ...f, sizes: f.sizes.includes(s) ? f.sizes.filter(x => x !== s) : [...f.sizes, s] }));
   const toggleColor = (c: string) => setForm(f => ({ ...f, colors: f.colors.includes(c) ? f.colors.filter(x => x !== c) : [...f.colors, c] }));
 
+  const QABadgeCount = unansweredQA.length;
+
   const GrowthBadge = ({ value }: { value: string }) => {
     const isPos = parseFloat(value) >= 0;
     return (
@@ -158,7 +186,13 @@ export const SellerDashboard = () => {
               <nav className="space-y-0.5">
                 {SIDEBAR_ITEMS.map(({ id, label, icon: Icon }) => (
                   <button key={id} onClick={() => setActive(id)} className={`sidebar-link w-full ${active === id ? "active" : ""}`}>
-                    <Icon className="w-4 h-4" />{label}
+                    <Icon className="w-4 h-4" />
+                    <span className="flex-1 text-left">{label}</span>
+                    {id === "qa-inbox" && QABadgeCount > 0 && (
+                      <span className="ml-auto bg-red-500 text-white text-xs w-5 h-5 rounded-full flex items-center justify-center font-bold">
+                        {QABadgeCount}
+                      </span>
+                    )}
                   </button>
                 ))}
                 <button onClick={() => { logout(); navigate("/"); }} className="sidebar-link w-full text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20">
@@ -401,6 +435,150 @@ export const SellerDashboard = () => {
                     </div>
                   ))}
                 </div>
+              </div>
+            )}
+
+            {/* Q&A Inbox */}
+            {active === "qa-inbox" && (
+              <div className="animate-fade-in space-y-5">
+                <div className="flex items-center justify-between">
+                  <h2 className="font-heading text-2xl font-bold">Q&A Inbox</h2>
+                  <div className="flex gap-2">
+                    <span className="badge bg-red-100 text-red-700 dark:bg-red-900/20 dark:text-red-400">
+                      {unansweredQA.length} unanswered
+                    </span>
+                    <span className="badge bg-green-100 text-green-700 dark:bg-green-900/20 dark:text-green-400">
+                      {answeredQA.length} answered
+                    </span>
+                  </div>
+                </div>
+
+                {allMyQA.length === 0 ? (
+                  <div className="bg-card border border-border rounded-2xl p-12 text-center">
+                    <MessageCircle className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
+                    <h3 className="font-heading text-xl font-semibold mb-2">No Questions Yet</h3>
+                    <p className="text-muted-foreground">Customer questions about your products will appear here.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {/* Unanswered first */}
+                    {unansweredQA.length > 0 && (
+                      <div>
+                        <div className="flex items-center gap-2 mb-3">
+                          <Bell className="w-4 h-4 text-red-500" />
+                          <h3 className="font-heading font-semibold text-sm text-red-600 dark:text-red-400">Needs Your Response ({unansweredQA.length})</h3>
+                        </div>
+                        <div className="space-y-3">
+                          {unansweredQA.map(q => {
+                            const product = myProducts.find(p => p.id === q.productId);
+                            const isExpanded = expandedQ === q.id;
+                            return (
+                              <div key={q.id} className="bg-card border-2 border-red-200 dark:border-red-800 rounded-2xl overflow-hidden">
+                                <div className="p-4">
+                                  <div className="flex items-start gap-3 mb-3">
+                                    {product && (
+                                      <img src={product.images[0]} alt={product.name} className="w-10 h-10 rounded-lg object-cover shrink-0 border border-border" />
+                                    )}
+                                    <div className="flex-1 min-w-0">
+                                      <div className="flex items-center gap-2 flex-wrap mb-0.5">
+                                        <span className="text-xs text-primary font-medium">{product?.name || "Unknown Product"}</span>
+                                        <span className="badge bg-red-100 text-red-600 dark:bg-red-900/20 dark:text-red-400 text-xs">Awaiting Reply</span>
+                                      </div>
+                                      <div className="flex items-center gap-2">
+                                        <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${q.userName}`} alt="" className="w-6 h-6 rounded-full border border-border" />
+                                        <span className="text-xs text-muted-foreground">{q.userName} · {new Date(q.createdAt).toLocaleDateString("en-IN")}</span>
+                                      </div>
+                                    </div>
+                                  </div>
+                                  <p className="text-foreground text-sm font-medium bg-muted rounded-xl px-3 py-2 mb-3">"{q.text}"</p>
+                                  {/* Quick reply */}
+                                  <div className="flex gap-2">
+                                    <input
+                                      value={qaAnswers[q.id] || ""}
+                                      onChange={e => setQaAnswers(a => ({ ...a, [q.id]: e.target.value }))}
+                                      placeholder="Type your reply as seller..."
+                                      className="input-field flex-1 text-sm py-2"
+                                      onKeyDown={e => e.key === "Enter" && handleQAReply(q.id)}
+                                    />
+                                    <button
+                                      onClick={() => handleQAReply(q.id)}
+                                      disabled={!qaAnswers[q.id]?.trim()}
+                                      className="btn-primary px-3 py-2 text-sm disabled:opacity-40"
+                                    >
+                                      <Send className="w-4 h-4" />
+                                    </button>
+                                  </div>
+                                  {/* Quick reply suggestions */}
+                                  <div className="flex flex-wrap gap-2 mt-2">
+                                    {[
+                                      "Yes, this carpet is suitable for high-traffic areas.",
+                                      "We recommend professional dry cleaning every 2-3 years.",
+                                      "This is available in all listed sizes. Custom sizes on request.",
+                                      "Delivery takes 5-7 business days across India.",
+                                    ].map(suggestion => (
+                                      <button
+                                        key={suggestion}
+                                        onClick={() => setQaAnswers(a => ({ ...a, [q.id]: suggestion }))}
+                                        className="text-xs px-2.5 py-1 rounded-full bg-primary/10 text-primary hover:bg-primary/20 transition-colors border border-primary/20 text-left"
+                                      >
+                                        {suggestion.slice(0, 40)}...
+                                      </button>
+                                    ))}
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Answered */}
+                    {answeredQA.length > 0 && (
+                      <div>
+                        <div className="flex items-center gap-2 mb-3">
+                          <Check className="w-4 h-4 text-green-500" />
+                          <h3 className="font-heading font-semibold text-sm text-green-600 dark:text-green-400">Answered Questions ({answeredQA.length})</h3>
+                        </div>
+                        <div className="space-y-3">
+                          {answeredQA.map(q => {
+                            const product = myProducts.find(p => p.id === q.productId);
+                            const sellerReply = q.answers.find(a => a.isSellerReply);
+                            const isExpanded = expandedQ === q.id;
+                            return (
+                              <div key={q.id} className="bg-card border border-border rounded-xl overflow-hidden">
+                                <button
+                                  onClick={() => setExpandedQ(isExpanded ? null : q.id)}
+                                  className="w-full p-4 flex items-center gap-3 text-left hover:bg-muted/50 transition-colors"
+                                >
+                                  {product && (
+                                    <img src={product.images[0]} alt={product.name} className="w-8 h-8 rounded-lg object-cover shrink-0 border border-border" />
+                                  )}
+                                  <div className="flex-1 min-w-0">
+                                    <p className="text-xs text-primary font-medium mb-0.5">{product?.name}</p>
+                                    <p className="text-sm text-foreground truncate">{q.text}</p>
+                                  </div>
+                                  <div className="flex items-center gap-2 shrink-0">
+                                    <span className="badge bg-green-100 text-green-700 dark:bg-green-900/20 dark:text-green-400 text-xs flex items-center gap-1">
+                                      <Check className="w-3 h-3" /> Answered
+                                    </span>
+                                    {isExpanded ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
+                                  </div>
+                                </button>
+                                {isExpanded && sellerReply && (
+                                  <div className="border-t border-border bg-muted/30 p-4">
+                                    <p className="text-xs font-semibold text-amber-600 mb-1">Your Reply:</p>
+                                    <p className="text-sm text-muted-foreground">{sellerReply.text}</p>
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             )}
 
