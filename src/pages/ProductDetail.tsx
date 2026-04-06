@@ -3,8 +3,10 @@ import { useParams, Link, useNavigate } from "react-router-dom";
 import {
   Heart, ShoppingCart, Star, Truck, Shield, RotateCcw,
   ChevronLeft, ChevronRight, Minus, Plus, Share2, Check,
-  ThumbsUp, BadgeCheck, Camera, BarChart2 as CompareIcon
+  ThumbsUp, BadgeCheck, Camera, BarChart2 as CompareIcon,
+  MessageCircle, Send, ChevronDown, ChevronUp, Award
 } from "lucide-react";
+import { useQAStore } from "@/stores/qaStore";
 import { ProductViewer360 } from "@/components/features/ProductViewer360";
 import { useCompareStore } from "@/stores/compareStore";
 import { useProductStore } from "@/stores/productStore";
@@ -26,6 +28,7 @@ export const ProductDetail = () => {
 
   const { addItem: addToCompare, removeItem: removeFromCompare, isInCompare } = useCompareStore();
   const { getOrdersByUser } = useOrderStore();
+  const { getByProduct, addQuestion, addAnswer, voteQuestion, voteAnswer } = useQAStore();
   const product = products.find(p => p.id === id);
   const [imgIdx, setImgIdx] = useState(0);
   const [size, setSize] = useState(product?.sizes[0] || "");
@@ -35,8 +38,14 @@ export const ProductDetail = () => {
   const [reviewRating, setReviewRating] = useState(5);
   const [reviewPhoto, setReviewPhoto] = useState<string | null>(null);
   const [helpfulVotes, setHelpfulVotes] = useState<Record<string, boolean>>({});
-  const [activeTab, setActiveTab] = useState<"description" | "reviews" | "care" | "viewer360">("description");
+  const [activeTab, setActiveTab] = useState<"description" | "reviews" | "care" | "viewer360" | "qa">("description");
   const photoInputRef = useRef<HTMLInputElement>(null);
+
+  // Q&A state
+  const [qaQuestion, setQaQuestion] = useState("");
+  const [qaAnswers, setQaAnswers] = useState<Record<string, string>>({});
+  const [expandedQA, setExpandedQA] = useState<Set<string>>(new Set());
+  const [showAnswerForm, setShowAnswerForm] = useState<string | null>(null);
 
   if (!product) {
     return (
@@ -53,6 +62,40 @@ export const ProductDetail = () => {
   const wishlisted = isWishlisted(product.id);
   const userOrders = user ? getOrdersByUser(user.id) : [];
   const isVerifiedBuyer = userOrders.some(o => o.items.some(i => i.productId === product.id));
+  const productQA = getByProduct(product.id);
+
+  const handleQAQuestion = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!isAuthenticated) { navigate("/login"); return; }
+    if (!qaQuestion.trim()) return;
+    addQuestion({ productId: product.id, userId: user!.id, userName: user!.name, text: qaQuestion });
+    setQaQuestion("");
+    toast.success("Question submitted! Seller will be notified.");
+  };
+
+  const handleQAAnswer = (questionId: string) => {
+    const text = qaAnswers[questionId];
+    if (!text?.trim()) return;
+    if (!isAuthenticated) { navigate("/login"); return; }
+    addAnswer(questionId, {
+      userId: user!.id,
+      userName: user!.name,
+      userRole: (user!.role === "seller" || user!.role === "admin") ? user!.role : "customer",
+      text,
+      isSellerReply: user!.role === "seller" || user!.role === "admin",
+    });
+    setQaAnswers(a => ({ ...a, [questionId]: "" }));
+    setShowAnswerForm(null);
+    toast.success("Answer posted!");
+  };
+
+  const toggleQAExpand = (id: string) => {
+    setExpandedQA(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
 
   // Ratings breakdown
   const allReviews = [...productReviews];
@@ -262,10 +305,10 @@ export const ProductDetail = () => {
         {/* Tabs */}
         <div className="mb-10">
           <div className="flex border-b border-border mb-6">
-            {(["description", "viewer360", "reviews", "care"] as const).map(tab => (
+            {(["description", "viewer360", "qa", "reviews", "care"] as const).map(tab => (
               <button key={tab} onClick={() => setActiveTab(tab)}
                 className={`px-6 py-3 text-sm font-medium capitalize border-b-2 transition-colors ${activeTab === tab ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"}`}>
-                {tab === "reviews" ? `Reviews (${productReviews.length})` : tab === "viewer360" ? "360° View" : tab}
+                {tab === "reviews" ? `Reviews (${productReviews.length})` : tab === "viewer360" ? "360° View" : tab === "qa" ? `Q&A (${productQA.length})` : tab}
               </button>
             ))}
           </div>
@@ -391,6 +434,153 @@ export const ProductDetail = () => {
                   </div>
                   <button type="submit" className="btn-primary">Submit Review</button>
                 </form>
+              )}
+            </div>
+          )}
+
+          {activeTab === "qa" && (
+            <div className="space-y-5 animate-fade-in">
+              {/* Ask a question */}
+              <div className="bg-primary/5 border border-primary/20 rounded-2xl p-5">
+                <h3 className="font-heading font-semibold mb-3 flex items-center gap-2">
+                  <MessageCircle className="w-5 h-5 text-primary" /> Have a Question?
+                </h3>
+                {isAuthenticated ? (
+                  <form onSubmit={handleQAQuestion} className="flex gap-3">
+                    <input
+                      value={qaQuestion}
+                      onChange={e => setQaQuestion(e.target.value)}
+                      placeholder="Ask about material, size, care instructions..."
+                      className="input-field flex-1"
+                      required
+                    />
+                    <button type="submit" className="btn-primary shrink-0">
+                      <Send className="w-4 h-4" /> Ask
+                    </button>
+                  </form>
+                ) : (
+                  <p className="text-sm text-muted-foreground">
+                    <Link to="/login" className="text-primary hover:underline">Login</Link> to ask a question
+                  </p>
+                )}
+              </div>
+
+              {productQA.length === 0 ? (
+                <div className="text-center py-10 bg-muted rounded-2xl">
+                  <MessageCircle className="w-10 h-10 text-muted-foreground mx-auto mb-3" />
+                  <p className="text-muted-foreground">No questions yet. Be the first to ask!</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {productQA.map(q => {
+                    const isExpanded = expandedQA.has(q.id);
+                    const userVotedQ = user && q.helpfulVotes.includes(user.id);
+                    return (
+                      <div key={q.id} className="bg-card border border-border rounded-2xl overflow-hidden">
+                        <div className="p-4">
+                          <div className="flex items-start gap-3">
+                            <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${q.userName}`} alt="" className="w-9 h-9 rounded-full border border-border shrink-0" />
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 flex-wrap mb-1">
+                                <span className="font-semibold text-sm">{q.userName}</span>
+                                <span className="text-xs text-muted-foreground">{new Date(q.createdAt).toLocaleDateString("en-IN")}</span>
+                                {q.isAnswered && (
+                                  <span className="badge bg-green-100 text-green-700 dark:bg-green-900/20 dark:text-green-400 flex items-center gap-1">
+                                    <Check className="w-3 h-3" /> Answered
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-foreground text-sm font-medium">{q.text}</p>
+                              <div className="flex items-center gap-3 mt-2">
+                                <button
+                                  onClick={() => user && voteQuestion(q.id, user.id)}
+                                  className={`flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full border transition-all ${
+                                    userVotedQ ? "border-primary bg-primary/10 text-primary" : "border-border text-muted-foreground hover:border-primary/40"
+                                  }`}
+                                >
+                                  <ThumbsUp className="w-3 h-3" /> Helpful ({q.helpfulVotes.length})
+                                </button>
+                                <button
+                                  onClick={() => setShowAnswerForm(showAnswerForm === q.id ? null : q.id)}
+                                  className="text-xs text-primary hover:underline flex items-center gap-1"
+                                >
+                                  <MessageCircle className="w-3 h-3" />
+                                  {showAnswerForm === q.id ? "Cancel" : "Answer"}
+                                </button>
+                                {q.answers.length > 0 && (
+                                  <button
+                                    onClick={() => toggleQAExpand(q.id)}
+                                    className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1"
+                                  >
+                                    {isExpanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                                    {q.answers.length} answer{q.answers.length > 1 ? "s" : ""}
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                          {showAnswerForm === q.id && isAuthenticated && (
+                            <div className="mt-3 ml-12 flex gap-2">
+                              <input
+                                value={qaAnswers[q.id] || ""}
+                                onChange={e => setQaAnswers(a => ({ ...a, [q.id]: e.target.value }))}
+                                placeholder={user?.role === "seller" ? "Reply as seller..." : "Share your answer..."}
+                                className="input-field flex-1 text-sm"
+                                onKeyDown={e => e.key === "Enter" && handleQAAnswer(q.id)}
+                              />
+                              <button onClick={() => handleQAAnswer(q.id)} className="btn-primary py-2 px-3 text-sm">
+                                <Send className="w-4 h-4" />
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                        {isExpanded && q.answers.length > 0 && (
+                          <div className="border-t border-border bg-muted/30">
+                            {q.answers.map((a, ai) => {
+                              const userVotedA = user && a.helpfulVotes.includes(user.id);
+                              return (
+                                <div key={a.id} className={`p-4 ${ai < q.answers.length - 1 ? "border-b border-border" : ""}`}>
+                                  <div className="flex items-start gap-3">
+                                    <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${a.userName}`} alt="" className="w-8 h-8 rounded-full border border-border shrink-0" />
+                                    <div className="flex-1 min-w-0">
+                                      <div className="flex items-center gap-2 flex-wrap mb-1">
+                                        <span className="font-semibold text-sm">{a.userName}</span>
+                                        {a.isSellerReply && (
+                                          <span className="badge bg-amber-100 text-amber-700 dark:bg-amber-900/20 dark:text-amber-400 flex items-center gap-1">
+                                            <Award className="w-3 h-3" /> Seller
+                                          </span>
+                                        )}
+                                        <span className="text-xs text-muted-foreground">{new Date(a.createdAt).toLocaleDateString("en-IN")}</span>
+                                      </div>
+                                      <p className="text-sm text-muted-foreground">{a.text}</p>
+                                      <button
+                                        onClick={() => user && voteAnswer(q.id, a.id, user.id)}
+                                        className={`mt-2 flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full border transition-all ${
+                                          userVotedA ? "border-primary bg-primary/10 text-primary" : "border-border text-muted-foreground hover:border-primary/40"
+                                        }`}
+                                      >
+                                        <ThumbsUp className="w-3 h-3" /> Helpful ({a.helpfulVotes.length})
+                                      </button>
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                        {!isExpanded && q.answers.length > 0 && (
+                          <button
+                            onClick={() => toggleQAExpand(q.id)}
+                            className="w-full py-2 text-xs text-primary border-t border-border hover:bg-muted/50 transition-colors flex items-center justify-center gap-1"
+                          >
+                            <ChevronDown className="w-3.5 h-3.5" />
+                            View {q.answers.length} answer{q.answers.length > 1 ? "s" : ""}
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
               )}
             </div>
           )}

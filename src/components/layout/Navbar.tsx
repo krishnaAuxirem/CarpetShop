@@ -1,13 +1,14 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { Link, NavLink, useNavigate } from "react-router-dom";
 import {
-  ShoppingCart, Heart, User, Menu, X, ChevronDown,
-  LogOut, LayoutDashboard, Package, Bell
+  ShoppingCart, Heart, Menu, X, ChevronDown,
+  LogOut, LayoutDashboard, Bell, Search
 } from "lucide-react";
 import { useAuthStore } from "@/stores/authStore";
 import { useCartStore } from "@/stores/cartStore";
 import { useWishlistStore } from "@/stores/wishlistStore";
 import { ThemeToggle } from "@/components/features/ThemeToggle";
+import { LiveSearch } from "@/components/features/LiveSearch";
 
 const NAV_LINKS = [
   { label: "Home", to: "/" },
@@ -21,6 +22,7 @@ const NAV_LINKS = [
 const TOOLS_LINKS = [
   { label: "Room Calculator", to: "/room-calculator" },
   { label: "AR Room Preview", to: "/room-preview" },
+  { label: "AR Camera Sizer", to: "/ar-camera" },
   { label: "Compare Products", to: "/compare" },
   { label: "Bulk Orders", to: "/bulk-order" },
 ];
@@ -30,6 +32,7 @@ export const Navbar = () => {
   const [scrolled, setScrolled] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [toolsOpen, setToolsOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
   const { user, isAuthenticated, logout } = useAuthStore();
   const totalItems = useCartStore(s => s.totalItems());
   const wishlistCount = useWishlistStore(s => s.items.length);
@@ -108,6 +111,14 @@ export const Navbar = () => {
           {/* Right Actions */}
           <div className="flex items-center gap-1">
             <ThemeToggle />
+            {/* Search toggle (desktop) */}
+            <button
+              onClick={() => setSearchOpen(s => !s)}
+              className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-muted transition-colors"
+              aria-label="Search"
+            >
+              {searchOpen ? <X className="w-5 h-5" /> : <Search className="w-5 h-5" />}
+            </button>
 
             {isAuthenticated && (
               <>
@@ -210,6 +221,15 @@ export const Navbar = () => {
                 </NavLink>
               ))}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Search bar slide-down */}
+      {searchOpen && (
+        <div className="border-t border-border bg-background/95 backdrop-blur-md px-4 py-3 animate-fade-in">
+          <div className="max-w-2xl mx-auto">
+            <LiveSearch onClose={() => setSearchOpen(false)} />
           </div>
         </div>
       )}
