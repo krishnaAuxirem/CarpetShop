@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { MapPin, CreditCard, Smartphone, Building2, CheckCircle, Lock, ChevronRight, Gift } from "lucide-react";
+import { MapPin, CreditCard, Smartphone, Building2, CheckCircle, Lock, ChevronRight, Gift, Tag, X, Check } from "lucide-react";
+import { useCouponStore } from "@/stores/couponStore";
 import { useCartStore } from "@/stores/cartStore";
 import { useAuthStore } from "@/stores/authStore";
 import { useOrderStore } from "@/stores/orderStore";
@@ -20,12 +21,16 @@ export const Checkout = () => {
   const { user } = useAuthStore();
   const { placeOrder } = useOrderStore();
   const { getPoints, getDiscount, redeemPoints, addPoints } = useReferralStore();
+  const { validateCoupon, applyCoupon, getDiscount: getCouponDiscount } = useCouponStore();
   const navigate = useNavigate();
   const [step, setStep] = useState<"address" | "payment" | "confirm">("address");
   const [paymentMethod, setPaymentMethod] = useState("upi");
   const [processing, setProcessing] = useState(false);
   const [pointsToRedeem, setPointsToRedeem] = useState(0);
   const [redeemEnabled, setRedeemEnabled] = useState(false);
+  const [couponCode, setCouponCode] = useState("");
+  const [appliedCoupon, setAppliedCoupon] = useState<ReturnType<typeof validateCoupon>["coupon"]>(undefined);
+  const [couponError, setCouponError] = useState("");
 
   const availablePoints = user ? getPoints(user.id) : 0;
   const maxRedeemable = Math.min(availablePoints, 2000);
@@ -44,7 +49,28 @@ export const Checkout = () => {
   const subtotal = totalAmount();
   const delivery = subtotal > 5000 ? 0 : 800;
   const pointsDiscount = redeemEnabled ? getDiscount(user?.id || "", pointsToRedeem) : 0;
-  const total = Math.max(0, subtotal + delivery - pointsDiscount);
+  const couponDiscount = appliedCoupon ? getCouponDiscount(appliedCoupon, subtotal) : 0;
+  const total = Math.max(0, subtotal + delivery - pointsDiscount - couponDiscount);
+
+  const handleApplyCoupon = () => {
+    if (!couponCode.trim()) { setCouponError("Please enter a coupon code"); return; }
+    const result = validateCoupon(couponCode.trim(), subtotal, user?.id || "");
+    if (result.valid && result.coupon) {
+      setAppliedCoupon(result.coupon);
+      setCouponError("");
+      toast.success(`Coupon applied! You save ₹${getCouponDiscount(result.coupon, subtotal).toLocaleString("en-IN")}`);
+    } else {
+      setCouponError(result.message);
+      setAppliedCoupon(undefined);
+    }
+  };
+
+  const handleRemoveCoupon = () => {
+    setAppliedCoupon(undefined);
+    setCouponCode("");
+    setCouponError("");
+    toast.success("Coupon removed");
+  };
 
   const handleAddressSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -59,9 +85,8 @@ export const Checkout = () => {
   const handlePayment = () => {
     setProcessing(true);
     setTimeout(() => {
-      if (redeemEnabled && pointsToRedeem > 0) {
-        redeemPoints(user!.id, pointsToRedeem);
-      }
+      if (redeemEnabled && pointsToRedeem > 0) redeemPoints(user!.id, pointsToRedeem);
+      if (appliedCoupon) applyCoupon(appliedCoupon.code, user!.id);
       const earnedPoints = Math.floor(subtotal / 100);
       addPoints(user!.id, earnedPoints, `Purchase of ${items.length} item(s)`, "earned_purchase");
       const order = placeOrder(user!.id, user!.name, items, address, paymentMethod);
@@ -199,6 +224,42 @@ export const Checkout = () => {
                   </div>
                 )}
 
+                {/* Coupon Code */}
+                <div className="mb-4">
+                  <label className="text-sm font-medium mb-2 block flex items-center gap-1.5"><Tag className="w-4 h-4 text-primary" /> Coupon Code</label>
+                  {appliedCoupon ? (
+                    <div className="flex items-center gap-3 bg-green-50 dark:bg-green-900/10 border border-green-200 dark:border-green-800 rounded-xl px-4 py-3">
+                      <Check className="w-5 h-5 text-green-600 shrink-0" />
+                      <div className="flex-1">
+                        <p className="text-sm font-bold text-green-700 dark:text-green-400">{appliedCoupon.code}</p>
+                        <p className="text-xs text-green-600">
+                          {appliedCoupon.type === "percentage" ? `${appliedCoupon.value}% off` : `₹${appliedCoupon.value} off`} · You save ₹{couponDiscount.toLocaleString("en-IN")}
+                        </p>
+                      </div>
+                      <button onClick={handleRemoveCoupon} className="w-7 h-7 flex items-center justify-center rounded-full hover:bg-green-200 dark:hover:bg-green-900/30 transition-colors"><X className="w-4 h-4 text-green-700" /></button>
+                    </div>
+                  ) : (
+                    <div>
+                      <div className="flex gap-2">
+                        <input
+                          value={couponCode}
+                          onChange={e => { setCouponCode(e.target.value.toUpperCase()); setCouponError(""); }}
+                          onKeyDown={e => e.key === "Enter" && handleApplyCoupon()}
+                          className={`input-field flex-1 font-mono tracking-wider ${couponError ? "border-red-400 focus:ring-red-400" : ""}`}
+                          placeholder="Enter coupon code"
+                        />
+                        <button onClick={handleApplyCoupon} className="btn-secondary px-4 py-2.5 text-sm shrink-0">Apply</button>
+                      </div>
+                      {couponError && <p className="text-xs text-red-500 mt-1">{couponError}</p>}
+                      <div className="flex gap-2 mt-2 flex-wrap">
+                        {["WELCOME20", "FLAT500"].map(code => (
+                          <button key={code} onClick={() => { setCouponCode(code); setCouponError(""); }} className="text-xs px-2.5 py-1 border border-dashed border-primary/50 text-primary rounded-full hover:bg-primary/5 transition-colors font-mono">{code}</button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
                 {/* Points Redemption */}
                 {availablePoints > 0 && (
                   <div className="mb-4 p-4 bg-amber-50 dark:bg-amber-900/10 rounded-xl border border-amber-200 dark:border-amber-800">
@@ -266,6 +327,12 @@ export const Checkout = () => {
               <div className="border-t border-border pt-4 space-y-2 text-sm">
                 <div className="flex justify-between"><span className="text-muted-foreground">Subtotal</span><span>₹{subtotal.toLocaleString("en-IN")}</span></div>
                 <div className="flex justify-between"><span className="text-muted-foreground">Delivery</span><span className={delivery === 0 ? "text-green-600" : ""}>{delivery === 0 ? "FREE" : `₹${delivery}`}</span></div>
+                {couponDiscount > 0 && (
+                  <div className="flex justify-between text-green-600 font-medium">
+                    <span className="flex items-center gap-1"><Tag className="w-3 h-3" /> Coupon ({appliedCoupon?.code})</span>
+                    <span>-₹{couponDiscount.toLocaleString("en-IN")}</span>
+                  </div>
+                )}
                 {pointsDiscount > 0 && (
                   <div className="flex justify-between text-green-600 font-medium">
                     <span>Points Discount</span><span>-₹{pointsDiscount}</span>

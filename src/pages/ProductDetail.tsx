@@ -3,8 +3,10 @@ import { useParams, Link, useNavigate } from "react-router-dom";
 import {
   Heart, ShoppingCart, Star, Truck, Shield, RotateCcw,
   ChevronLeft, ChevronRight, Minus, Plus, Share2, Check,
-  ThumbsUp, Image, BadgeCheck, BarChart2, Camera
+  ThumbsUp, BadgeCheck, Camera, BarChart2 as CompareIcon
 } from "lucide-react";
+import { ProductViewer360 } from "@/components/features/ProductViewer360";
+import { useCompareStore } from "@/stores/compareStore";
 import { useProductStore } from "@/stores/productStore";
 import { useCartStore } from "@/stores/cartStore";
 import { useWishlistStore } from "@/stores/wishlistStore";
@@ -22,6 +24,7 @@ export const ProductDetail = () => {
   const { user, isAuthenticated } = useAuthStore();
   const navigate = useNavigate();
 
+  const { addItem: addToCompare, removeItem: removeFromCompare, isInCompare } = useCompareStore();
   const { getOrdersByUser } = useOrderStore();
   const product = products.find(p => p.id === id);
   const [imgIdx, setImgIdx] = useState(0);
@@ -32,7 +35,7 @@ export const ProductDetail = () => {
   const [reviewRating, setReviewRating] = useState(5);
   const [reviewPhoto, setReviewPhoto] = useState<string | null>(null);
   const [helpfulVotes, setHelpfulVotes] = useState<Record<string, boolean>>({});
-  const [activeTab, setActiveTab] = useState<"description" | "reviews" | "care">("description");
+  const [activeTab, setActiveTab] = useState<"description" | "reviews" | "care" | "viewer360">("description");
   const photoInputRef = useRef<HTMLInputElement>(null);
 
   if (!product) {
@@ -75,6 +78,17 @@ export const ProductDetail = () => {
     if (!isAuthenticated) { navigate("/login"); return; }
     toggleWishlist(product);
     toast.success(wishlisted ? "Removed from wishlist" : "Added to wishlist!");
+  };
+
+  const handleCompare = () => {
+    if (isInCompare(product.id)) {
+      removeFromCompare(product.id);
+      toast.success("Removed from comparison");
+    } else {
+      const added = addToCompare(product);
+      if (!added) toast.error("You can compare up to 3 products");
+      else toast.success("Added to compare!");
+    }
   };
 
   const handleReview = (e: React.FormEvent) => {
@@ -219,6 +233,12 @@ export const ProductDetail = () => {
               <button onClick={() => { navigator.share?.({ title: product.name, url: window.location.href }); toast.success("Link copied!"); }} className="w-12 h-12 flex items-center justify-center rounded-xl border border-border hover:border-primary/50 transition-all">
                 <Share2 className="w-5 h-5" />
               </button>
+              <button onClick={handleCompare} title={isInCompare(product.id) ? "Remove from compare" : "Compare"}
+                className={`w-12 h-12 flex items-center justify-center rounded-xl border transition-all ${
+                  isInCompare(product.id) ? "border-primary bg-primary/10 text-primary" : "border-border hover:border-primary/50"
+                }`}>
+                <CompareIcon className="w-5 h-5" />
+              </button>
             </div>
 
             <button onClick={handleBuyNow} className="w-full btn-accent mb-6">Buy Now</button>
@@ -242,13 +262,19 @@ export const ProductDetail = () => {
         {/* Tabs */}
         <div className="mb-10">
           <div className="flex border-b border-border mb-6">
-            {(["description", "reviews", "care"] as const).map(tab => (
+            {(["description", "viewer360", "reviews", "care"] as const).map(tab => (
               <button key={tab} onClick={() => setActiveTab(tab)}
                 className={`px-6 py-3 text-sm font-medium capitalize border-b-2 transition-colors ${activeTab === tab ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"}`}>
-                {tab === "reviews" ? `Reviews (${productReviews.length})` : tab}
+                {tab === "reviews" ? `Reviews (${productReviews.length})` : tab === "viewer360" ? "360° View" : tab}
               </button>
             ))}
           </div>
+
+          {activeTab === "viewer360" && (
+            <div className="animate-fade-in">
+              <ProductViewer360 images={product.images.length >= 2 ? product.images : [...product.images, ...product.images, ...product.images]} productName={product.name} />
+            </div>
+          )}
 
           {activeTab === "description" && (
             <div className="prose dark:prose-invert max-w-none">

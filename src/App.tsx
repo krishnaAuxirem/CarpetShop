@@ -30,7 +30,10 @@ import { PrivacyPolicy, Terms, Support } from "@/pages/StaticPages";
 import { NotFound } from "@/pages/NotFound";
 import { RoomPreview } from "@/pages/RoomPreview";
 import { BulkOrder } from "@/pages/BulkOrder";
+import { Compare } from "@/pages/Compare";
+import { RoomCalculator } from "@/pages/RoomCalculator";
 import { ChatWidget } from "@/components/features/ChatWidget";
+import { CompareBar } from "@/components/features/CompareBar";
 
 const ProtectedRoute = ({ children, requiredRole }: { children: React.ReactNode; requiredRole?: string }) => {
   const { isAuthenticated, user } = useAuthStore();
@@ -49,10 +52,11 @@ const LoadingSpinner = () => (
 const AppLayout = ({ children }: { children: React.ReactNode }) => (
   <>
     <Navbar />
-    <main className="min-h-screen">{children}</main>
+    <main className="min-h-screen pb-16">{children}</main>
     <Footer />
     <ScrollToTopButton />
     <ChatWidget />
+    <CompareBar />
   </>
 );
 
@@ -86,6 +90,9 @@ function App() {
         <Route path="/order-tracking" element={<AppLayout><OrderTracking /></AppLayout>} />
         <Route path="/room-preview" element={<AppLayout><RoomPreview /></AppLayout>} />
         <Route path="/bulk-order" element={<AppLayout><BulkOrder /></AppLayout>} />
+        <Route path="/compare" element={<AppLayout><Compare /></AppLayout>} />
+        <Route path="/room-calculator" element={<AppLayout><RoomCalculator /></AppLayout>} />
+        <Route path="/wishlist/shared/:shareId" element={<AppLayout><Wishlist /></AppLayout>} />
 
         {/* Protected routes */}
         <Route path="/cart" element={<AppLayout><ProtectedRoute><Cart /></ProtectedRoute></AppLayout>} />

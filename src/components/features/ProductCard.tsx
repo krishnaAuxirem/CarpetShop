@@ -1,9 +1,10 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Heart, ShoppingCart, Star, Eye, Zap } from "lucide-react";
+import { Heart, ShoppingCart, Star, Eye, Zap, BarChart2, Check } from "lucide-react";
 import { useCartStore } from "@/stores/cartStore";
 import { useWishlistStore } from "@/stores/wishlistStore";
 import { useAuthStore } from "@/stores/authStore";
+import { useCompareStore } from "@/stores/compareStore";
 import type { Product } from "@/types";
 import { toast } from "sonner";
 
@@ -32,8 +33,22 @@ export const ProductCard = ({ product }: ProductCardProps) => {
     toast.success(isWishlisted(product.id) ? "Removed from wishlist" : "Added to wishlist!");
   };
 
+  const { addItem: addToCompare, removeItem: removeFromCompare, isInCompare } = useCompareStore();
   const wishListed = isWishlisted(product.id);
   const inCart = isInCart(product.id);
+  const inCompare = isInCompare(product.id);
+
+  const handleCompare = (e: React.MouseEvent) => {
+    e.preventDefault();
+    if (inCompare) {
+      removeFromCompare(product.id);
+      toast.success("Removed from comparison");
+    } else {
+      const added = addToCompare(product);
+      if (!added) toast.error("You can compare up to 3 products at a time");
+      else toast.success(`${product.name} added to compare!`);
+    }
+  };
 
   return (
     <Link to={`/product/${product.id}`} className="group block">
@@ -79,6 +94,15 @@ export const ProductCard = ({ product }: ProductCardProps) => {
             >
               <Eye className="w-4 h-4" />
             </Link>
+            <button
+              onClick={handleCompare}
+              title={inCompare ? "Remove from compare" : "Add to compare"}
+              className={`w-9 h-9 rounded-full flex items-center justify-center shadow-md transition-all duration-200 hover:scale-110 ${
+                inCompare ? "bg-primary text-white" : "bg-white/90 text-gray-600"
+              }`}
+            >
+              {inCompare ? <Check className="w-4 h-4" /> : <BarChart2 className="w-4 h-4" />}
+            </button>
           </div>
 
           {/* Quick add overlay */}

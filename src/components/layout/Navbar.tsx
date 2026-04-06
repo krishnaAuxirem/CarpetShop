@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Link, NavLink, useNavigate } from "react-router-dom";
 import {
   ShoppingCart, Heart, User, Menu, X, ChevronDown,
@@ -18,10 +18,18 @@ const NAV_LINKS = [
   { label: "Contact", to: "/contact" },
 ];
 
+const TOOLS_LINKS = [
+  { label: "Room Calculator", to: "/room-calculator" },
+  { label: "AR Room Preview", to: "/room-preview" },
+  { label: "Compare Products", to: "/compare" },
+  { label: "Bulk Orders", to: "/bulk-order" },
+];
+
 export const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [toolsOpen, setToolsOpen] = useState(false);
   const { user, isAuthenticated, logout } = useAuthStore();
   const totalItems = useCartStore(s => s.totalItems());
   const wishlistCount = useWishlistStore(s => s.items.length);
@@ -76,6 +84,25 @@ export const Navbar = () => {
                 {link.label}
               </NavLink>
             ))}
+            {/* Tools dropdown */}
+            <div className="relative">
+              <button
+                onClick={() => setToolsOpen(t => !t)}
+                className="px-3 py-2 rounded-md text-sm font-medium text-foreground hover:text-primary hover:bg-primary/5 transition-all flex items-center gap-1"
+              >
+                Tools <ChevronDown className={`w-3.5 h-3.5 transition-transform ${toolsOpen ? "rotate-180" : ""}`} />
+              </button>
+              {toolsOpen && (
+                <div className="absolute left-0 top-10 w-48 bg-card border border-border rounded-xl shadow-xl z-50 overflow-hidden animate-scale-in">
+                  {TOOLS_LINKS.map(link => (
+                    <Link key={link.to} to={link.to} onClick={() => setToolsOpen(false)}
+                      className="block px-4 py-2.5 text-sm hover:bg-muted hover:text-primary transition-colors">
+                      {link.label}
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Right Actions */}
@@ -174,11 +201,20 @@ export const Navbar = () => {
                 <Link to="/register" onClick={() => setIsOpen(false)} className="flex-1 text-center py-2 text-sm font-medium bg-primary text-white rounded-lg">Register</Link>
               </div>
             )}
+            <div className="pt-2 border-t border-border">
+              <p className="text-xs text-muted-foreground px-3 mb-1 font-medium">Tools</p>
+              {TOOLS_LINKS.map(link => (
+                <NavLink key={link.to} to={link.to} onClick={() => setIsOpen(false)}
+                  className={({ isActive }) => `block px-3 py-2 rounded-lg text-sm ${isActive ? "text-primary bg-primary/10" : "text-foreground"}`}>
+                  {link.label}
+                </NavLink>
+              ))}
+            </div>
           </div>
         </div>
       )}
 
-      {dropdownOpen && <div className="fixed inset-0 z-40" onClick={() => setDropdownOpen(false)} />}
+      {(dropdownOpen || toolsOpen) && <div className="fixed inset-0 z-40" onClick={() => { setDropdownOpen(false); setToolsOpen(false); }} />}
     </nav>
   );
 };

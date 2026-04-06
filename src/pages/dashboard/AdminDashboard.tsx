@@ -2,9 +2,10 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Users, Package, ShoppingBag, BarChart2, Settings, LogOut,
-  Tag, FileText, Trash2, Edit3, UserCheck, UserX, TrendingUp,
-  DollarSign, AlertCircle, Plus, Check, X
+  Tag, FileText, Trash2, Edit3, TrendingUp,
+  DollarSign, Plus, Check, X, Percent, Calendar, Hash, ToggleLeft, ToggleRight
 } from "lucide-react";
+import { useCouponStore, type Coupon } from "@/stores/couponStore";
 import { useAuthStore } from "@/stores/authStore";
 import { useProductStore } from "@/stores/productStore";
 import { useOrderStore } from "@/stores/orderStore";
@@ -18,7 +19,8 @@ const SIDEBAR_ITEMS = [
   { id: "users", label: "Manage Users", icon: Users },
   { id: "products", label: "Manage Products", icon: Package },
   { id: "orders", label: "Manage Orders", icon: ShoppingBag },
-  { id: "categories", label: "Categories", icon: Tag },
+  { id: "coupons", label: "Coupons", icon: Tag },
+  { id: "categories", label: "Categories", icon: Hash },
   { id: "blog", label: "Blog Management", icon: FileText },
   { id: "settings", label: "Platform Settings", icon: Settings },
 ];
@@ -39,11 +41,18 @@ export const AdminDashboard = () => {
   const { products, deleteProduct } = useProductStore();
   const { getAllOrders, updateOrderStatus } = useOrderStore();
   const { posts, addPost, updatePost, deletePost } = useBlogStore();
+  const { coupons, addCoupon, updateCoupon, deleteCoupon, toggleActive: toggleCouponActive } = useCouponStore();
   const navigate = useNavigate();
   const [active, setActive] = useState("overview");
   const [blogForm, setBlogForm] = useState({ title: "", excerpt: "", content: "", category: "Interior Design", image: "", isPublished: false });
   const [editBlogId, setEditBlogId] = useState<string | null>(null);
   const [showBlogForm, setShowBlogForm] = useState(false);
+
+  // Coupon form state
+  const emptyCouponForm = { code: "", type: "percentage" as "percentage" | "flat", value: 10, minOrderValue: 0, maxUses: 100, expiryDate: "", isActive: true, isSingleUse: false, description: "" };
+  const [couponForm, setCouponForm] = useState(emptyCouponForm);
+  const [showCouponForm, setShowCouponForm] = useState(false);
+  const [editCouponId, setEditCouponId] = useState<string | null>(null);
 
   if (!user || user.role !== "admin") { navigate("/login"); return null; }
 
@@ -262,6 +271,166 @@ export const AdminDashboard = () => {
                       </div>
                     </div>
                   ))}
+                </div>
+              </div>
+            )}
+
+            {/* Coupons */}
+            {active === "coupons" && (
+              <div className="animate-fade-in">
+                <div className="flex items-center justify-between mb-6">
+                  <h2 className="font-heading text-2xl font-bold">Coupon Management ({coupons.length})</h2>
+                  <button onClick={() => { setCouponForm(emptyCouponForm); setEditCouponId(null); setShowCouponForm(true); }} className="btn-primary text-sm">
+                    <Plus className="w-4 h-4" /> New Coupon
+                  </button>
+                </div>
+
+                {showCouponForm && (
+                  <div className="bg-card border border-border rounded-2xl p-6 mb-6 animate-scale-in">
+                    <h3 className="font-heading font-semibold mb-4">{editCouponId ? "Edit Coupon" : "Create New Coupon"}</h3>
+                    <form onSubmit={e => {
+                      e.preventDefault();
+                      if (!couponForm.code || !couponForm.expiryDate) { toast.error("Fill all required fields"); return; }
+                      if (editCouponId) {
+                        updateCoupon(editCouponId, couponForm);
+                        toast.success("Coupon updated!");
+                      } else {
+                        addCoupon(couponForm);
+                        toast.success("Coupon created!");
+                      }
+                      setShowCouponForm(false); setEditCouponId(null); setCouponForm(emptyCouponForm);
+                    }} className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="text-sm font-medium mb-1.5 block">Coupon Code *</label>
+                        <input value={couponForm.code} onChange={e => setCouponForm(f => ({ ...f, code: e.target.value.toUpperCase() }))} className="input-field font-mono tracking-wider" placeholder="e.g. SUMMER25" required />
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium mb-1.5 block">Description</label>
+                        <input value={couponForm.description} onChange={e => setCouponForm(f => ({ ...f, description: e.target.value }))} className="input-field" placeholder="Short description" />
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium mb-1.5 block">Discount Type</label>
+                        <select value={couponForm.type} onChange={e => setCouponForm(f => ({ ...f, type: e.target.value as "percentage" | "flat" }))} className="input-field">
+                          <option value="percentage">Percentage (%)</option>
+                          <option value="flat">Flat Amount (₹)</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium mb-1.5 block">{couponForm.type === "percentage" ? "Discount %" : "Discount Amount (₹)"}</label>
+                        <input type="number" min="1" max={couponForm.type === "percentage" ? 99 : undefined} value={couponForm.value} onChange={e => setCouponForm(f => ({ ...f, value: parseInt(e.target.value) || 0 }))} className="input-field" required />
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium mb-1.5 block">Minimum Order Value (₹)</label>
+                        <input type="number" min="0" value={couponForm.minOrderValue} onChange={e => setCouponForm(f => ({ ...f, minOrderValue: parseInt(e.target.value) || 0 }))} className="input-field" />
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium mb-1.5 block">Max Uses</label>
+                        <input type="number" min="1" value={couponForm.maxUses} onChange={e => setCouponForm(f => ({ ...f, maxUses: parseInt(e.target.value) || 1 }))} className="input-field" />
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium mb-1.5 block">Expiry Date *</label>
+                        <input type="date" value={couponForm.expiryDate} onChange={e => setCouponForm(f => ({ ...f, expiryDate: e.target.value }))} className="input-field" required />
+                      </div>
+                      <div className="flex items-center gap-6 pt-4">
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input type="checkbox" checked={couponForm.isActive} onChange={e => setCouponForm(f => ({ ...f, isActive: e.target.checked }))} className="w-4 h-4 accent-primary" />
+                          <span className="text-sm font-medium">Active</span>
+                        </label>
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input type="checkbox" checked={couponForm.isSingleUse} onChange={e => setCouponForm(f => ({ ...f, isSingleUse: e.target.checked }))} className="w-4 h-4 accent-primary" />
+                          <span className="text-sm font-medium">Single-use per user</span>
+                        </label>
+                      </div>
+                      <div className="sm:col-span-2 flex gap-3 pt-2">
+                        <button type="submit" className="btn-primary text-sm">{editCouponId ? "Update Coupon" : "Create Coupon"}</button>
+                        <button type="button" onClick={() => { setShowCouponForm(false); setEditCouponId(null); }} className="btn-secondary text-sm">Cancel</button>
+                      </div>
+                    </form>
+                  </div>
+                )}
+
+                <div className="bg-card border border-border rounded-2xl overflow-hidden">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead className="bg-muted/50">
+                        <tr>
+                          <th className="text-left px-4 py-3 font-medium">Code</th>
+                          <th className="text-left px-4 py-3 font-medium">Type</th>
+                          <th className="text-left px-4 py-3 font-medium">Value</th>
+                          <th className="text-left px-4 py-3 font-medium">Min Order</th>
+                          <th className="text-left px-4 py-3 font-medium">Usage</th>
+                          <th className="text-left px-4 py-3 font-medium">Expiry</th>
+                          <th className="text-left px-4 py-3 font-medium">Status</th>
+                          <th className="text-left px-4 py-3 font-medium">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-border">
+                        {coupons.map(coupon => {
+                          const isExpired = new Date(coupon.expiryDate) < new Date();
+                          return (
+                            <tr key={coupon.id} className="hover:bg-muted/30 transition-colors">
+                              <td className="px-4 py-3">
+                                <div>
+                                  <code className="font-mono font-bold text-primary">{coupon.code}</code>
+                                  {coupon.isSingleUse && <span className="ml-2 badge bg-purple-100 text-purple-700 text-xs">1×</span>}
+                                  <p className="text-xs text-muted-foreground mt-0.5">{coupon.description}</p>
+                                </div>
+                              </td>
+                              <td className="px-4 py-3">
+                                <span className={`badge text-xs ${coupon.type === "percentage" ? "bg-blue-100 text-blue-700" : "bg-green-100 text-green-700"}`}>
+                                  {coupon.type === "percentage" ? <><Percent className="w-3 h-3 inline" /> %</> : "₹ Flat"}
+                                </span>
+                              </td>
+                              <td className="px-4 py-3 font-bold text-primary">
+                                {coupon.type === "percentage" ? `${coupon.value}%` : `₹${coupon.value}`}
+                              </td>
+                              <td className="px-4 py-3 text-muted-foreground">
+                                {coupon.minOrderValue > 0 ? `₹${coupon.minOrderValue.toLocaleString("en-IN")}` : "—"}
+                              </td>
+                              <td className="px-4 py-3">
+                                <div>
+                                  <div className="flex items-center gap-1 text-xs">
+                                    <span className="font-medium">{coupon.usedCount}</span>
+                                    <span className="text-muted-foreground">/ {coupon.maxUses}</span>
+                                  </div>
+                                  <div className="w-16 h-1.5 bg-muted rounded-full mt-1 overflow-hidden">
+                                    <div className="h-full bg-primary rounded-full" style={{ width: `${(coupon.usedCount / coupon.maxUses) * 100}%` }} />
+                                  </div>
+                                </div>
+                              </td>
+                              <td className="px-4 py-3">
+                                <div className="flex items-center gap-1 text-xs">
+                                  <Calendar className="w-3 h-3" />
+                                  <span className={isExpired ? "text-red-500" : "text-muted-foreground"}>
+                                    {new Date(coupon.expiryDate).toLocaleDateString("en-IN")}
+                                  </span>
+                                  {isExpired && <span className="badge bg-red-100 text-red-700 text-xs">Expired</span>}
+                                </div>
+                              </td>
+                              <td className="px-4 py-3">
+                                <button onClick={() => { toggleCouponActive(coupon.id); toast.success(coupon.isActive ? "Coupon deactivated" : "Coupon activated"); }}>
+                                  {coupon.isActive ? <ToggleRight className="w-6 h-6 text-green-500" /> : <ToggleLeft className="w-6 h-6 text-muted-foreground" />}
+                                </button>
+                              </td>
+                              <td className="px-4 py-3">
+                                <div className="flex gap-1.5">
+                                  <button onClick={() => { setCouponForm({ code: coupon.code, type: coupon.type, value: coupon.value, minOrderValue: coupon.minOrderValue, maxUses: coupon.maxUses, expiryDate: coupon.expiryDate, isActive: coupon.isActive, isSingleUse: coupon.isSingleUse, description: coupon.description }); setEditCouponId(coupon.id); setShowCouponForm(true); }} className="w-7 h-7 flex items-center justify-center border border-border rounded-lg hover:bg-muted">
+                                    <Edit3 className="w-3 h-3" />
+                                  </button>
+                                  <button onClick={() => { deleteCoupon(coupon.id); toast.success("Coupon deleted"); }} className="w-7 h-7 flex items-center justify-center border border-red-200 text-red-500 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20">
+                                    <Trash2 className="w-3 h-3" />
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                  {coupons.length === 0 && (
+                    <div className="text-center py-10 text-muted-foreground text-sm">No coupons yet. Create your first one!</div>
+                  )}
                 </div>
               </div>
             )}
