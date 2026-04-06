@@ -1,9 +1,10 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { MapPin, CreditCard, Smartphone, Building2, CheckCircle, Lock, ChevronRight } from "lucide-react";
+import { MapPin, CreditCard, Smartphone, Building2, CheckCircle, Lock, ChevronRight, Gift } from "lucide-react";
 import { useCartStore } from "@/stores/cartStore";
 import { useAuthStore } from "@/stores/authStore";
 import { useOrderStore } from "@/stores/orderStore";
+import { useReferralStore } from "@/stores/referralStore";
 import type { Address } from "@/types";
 import { toast } from "sonner";
 
@@ -18,10 +19,16 @@ export const Checkout = () => {
   const { items, totalAmount, clearCart } = useCartStore();
   const { user } = useAuthStore();
   const { placeOrder } = useOrderStore();
+  const { getPoints, getDiscount, redeemPoints, addPoints } = useReferralStore();
   const navigate = useNavigate();
   const [step, setStep] = useState<"address" | "payment" | "confirm">("address");
   const [paymentMethod, setPaymentMethod] = useState("upi");
   const [processing, setProcessing] = useState(false);
+  const [pointsToRedeem, setPointsToRedeem] = useState(0);
+  const [redeemEnabled, setRedeemEnabled] = useState(false);
+
+  const availablePoints = user ? getPoints(user.id) : 0;
+  const maxRedeemable = Math.min(availablePoints, 2000);
 
   const [address, setAddress] = useState<Address>({
     name: user?.name || "",
@@ -36,7 +43,8 @@ export const Checkout = () => {
 
   const subtotal = totalAmount();
   const delivery = subtotal > 5000 ? 0 : 800;
-  const total = subtotal + delivery;
+  const pointsDiscount = redeemEnabled ? getDiscount(user?.id || "", pointsToRedeem) : 0;
+  const total = Math.max(0, subtotal + delivery - pointsDiscount);
 
   const handleAddressSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -51,8 +59,14 @@ export const Checkout = () => {
   const handlePayment = () => {
     setProcessing(true);
     setTimeout(() => {
+      if (redeemEnabled && pointsToRedeem > 0) {
+        redeemPoints(user!.id, pointsToRedeem);
+      }
+      const earnedPoints = Math.floor(subtotal / 100);
+      addPoints(user!.id, earnedPoints, `Purchase of ${items.length} item(s)`, "earned_purchase");
       const order = placeOrder(user!.id, user!.name, items, address, paymentMethod);
       clearCart();
+      toast.success(`+${earnedPoints} reward points earned!`, { duration: 4000 });
       navigate(`/order-confirmation/${order.id}`);
     }, 2000);
   };
@@ -142,7 +156,7 @@ export const Checkout = () => {
                 <h2 className="font-heading text-xl font-bold mb-6 flex items-center gap-2">
                   <CreditCard className="w-5 h-5 text-primary" /> Payment Method
                 </h2>
-                <div className="space-y-3 mb-8">
+                <div className="space-y-3 mb-6">
                   {PAYMENT_METHODS.map(({ id, label, icon: Icon, desc }) => (
                     <button key={id} onClick={() => setPaymentMethod(id)}
                       className={`w-full flex items-center gap-4 p-4 rounded-xl border-2 transition-all text-left ${paymentMethod === id ? "border-primary bg-primary/5" : "border-border hover:border-primary/40"}`}>
@@ -161,13 +175,13 @@ export const Checkout = () => {
                 </div>
 
                 {paymentMethod === "upi" && (
-                  <div className="bg-muted rounded-xl p-4 mb-6">
+                  <div className="bg-muted rounded-xl p-4 mb-4">
                     <label className="text-sm font-medium mb-2 block">UPI ID</label>
-                    <input className="input-field" placeholder="yourname@upi" defaultValue="" />
+                    <input className="input-field" placeholder="yourname@upi" />
                   </div>
                 )}
                 {paymentMethod === "card" && (
-                  <div className="bg-muted rounded-xl p-4 mb-6 space-y-3">
+                  <div className="bg-muted rounded-xl p-4 mb-4 space-y-3">
                     <div>
                       <label className="text-sm font-medium mb-1.5 block">Card Number</label>
                       <input className="input-field" placeholder="•••• •••• •••• ••••" maxLength={19} />
@@ -185,14 +199,42 @@ export const Checkout = () => {
                   </div>
                 )}
 
-                <div className="flex items-center gap-2 text-xs text-muted-foreground mb-6 bg-green-50 dark:bg-green-900/10 p-3 rounded-lg">
-                  <Lock className="w-4 h-4 text-green-600" />
+                {/* Points Redemption */}
+                {availablePoints > 0 && (
+                  <div className="mb-4 p-4 bg-amber-50 dark:bg-amber-900/10 rounded-xl border border-amber-200 dark:border-amber-800">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <Gift className="w-4 h-4 text-amber-600" />
+                        <span className="text-sm font-semibold text-amber-700 dark:text-amber-400">Reward Points Balance</span>
+                      </div>
+                      <span className="text-sm font-bold text-amber-700 dark:text-amber-400">{availablePoints} pts</span>
+                    </div>
+                    <label className="flex items-center gap-2 cursor-pointer mb-2">
+                      <input type="checkbox" checked={redeemEnabled} onChange={e => { setRedeemEnabled(e.target.checked); if (!e.target.checked) setPointsToRedeem(0); }} className="w-4 h-4 accent-amber-600" />
+                      <span className="text-xs text-amber-700 dark:text-amber-400">Use points for discount (1 pt = ₹0.10)</span>
+                    </label>
+                    {redeemEnabled && (
+                      <div>
+                        <div className="flex items-center gap-3">
+                          <input type="range" min={0} max={maxRedeemable} step={100} value={pointsToRedeem} onChange={e => setPointsToRedeem(parseInt(e.target.value))} className="flex-1 accent-amber-600" />
+                          <span className="text-xs font-bold w-20 text-right shrink-0">{pointsToRedeem} pts</span>
+                        </div>
+                        {pointsToRedeem > 0 && (
+                          <p className="text-xs text-green-600 mt-1 font-medium">You save ₹{pointsDiscount} using {pointsToRedeem} points</p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                <div className="flex items-center gap-2 text-xs text-muted-foreground mb-4 bg-green-50 dark:bg-green-900/10 p-3 rounded-lg">
+                  <Lock className="w-4 h-4 text-green-600 shrink-0" />
                   <span>Your payment information is encrypted and secure. We never store card details.</span>
                 </div>
 
                 <div className="flex gap-3">
                   <button onClick={() => setStep("address")} className="btn-secondary flex-1 justify-center">Back</button>
-                  <button onClick={handlePayment} disabled={processing} className="btn-primary flex-2 flex-1 justify-center">
+                  <button onClick={handlePayment} disabled={processing} className="btn-primary flex-1 justify-center">
                     {processing ? (
                       <div className="flex items-center gap-2">
                         <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
@@ -224,10 +266,21 @@ export const Checkout = () => {
               <div className="border-t border-border pt-4 space-y-2 text-sm">
                 <div className="flex justify-between"><span className="text-muted-foreground">Subtotal</span><span>₹{subtotal.toLocaleString("en-IN")}</span></div>
                 <div className="flex justify-between"><span className="text-muted-foreground">Delivery</span><span className={delivery === 0 ? "text-green-600" : ""}>{delivery === 0 ? "FREE" : `₹${delivery}`}</span></div>
+                {pointsDiscount > 0 && (
+                  <div className="flex justify-between text-green-600 font-medium">
+                    <span>Points Discount</span><span>-₹{pointsDiscount}</span>
+                  </div>
+                )}
                 <div className="flex justify-between font-bold text-base pt-2 border-t border-border">
                   <span>Total</span><span className="text-primary">₹{total.toLocaleString("en-IN")}</span>
                 </div>
               </div>
+              {availablePoints > 0 && !redeemEnabled && (
+                <div className="mt-3 p-2 bg-amber-50 dark:bg-amber-900/10 rounded-lg text-xs text-amber-700 dark:text-amber-400 text-center">
+                  <Gift className="w-3 h-3 inline mr-1" />
+                  You have <strong>{availablePoints}</strong> reward points to redeem on payment step!
+                </div>
+              )}
               {step === "payment" && address.city && (
                 <div className="mt-4 p-3 bg-muted rounded-xl text-xs text-muted-foreground">
                   <p className="font-semibold text-foreground mb-1">Delivering to:</p>

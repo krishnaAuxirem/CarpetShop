@@ -28,6 +28,9 @@ import { Wishlist } from "@/pages/Wishlist";
 import { Notifications } from "@/pages/Notifications";
 import { PrivacyPolicy, Terms, Support } from "@/pages/StaticPages";
 import { NotFound } from "@/pages/NotFound";
+import { RoomPreview } from "@/pages/RoomPreview";
+import { BulkOrder } from "@/pages/BulkOrder";
+import { ChatWidget } from "@/components/features/ChatWidget";
 
 const ProtectedRoute = ({ children, requiredRole }: { children: React.ReactNode; requiredRole?: string }) => {
   const { isAuthenticated, user } = useAuthStore();
@@ -49,6 +52,7 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => (
     <main className="min-h-screen">{children}</main>
     <Footer />
     <ScrollToTopButton />
+    <ChatWidget />
   </>
 );
 
@@ -80,6 +84,8 @@ function App() {
         <Route path="/terms" element={<AppLayout><Terms /></AppLayout>} />
         <Route path="/support" element={<AppLayout><Support /></AppLayout>} />
         <Route path="/order-tracking" element={<AppLayout><OrderTracking /></AppLayout>} />
+        <Route path="/room-preview" element={<AppLayout><RoomPreview /></AppLayout>} />
+        <Route path="/bulk-order" element={<AppLayout><BulkOrder /></AppLayout>} />
 
         {/* Protected routes */}
         <Route path="/cart" element={<AppLayout><ProtectedRoute><Cart /></ProtectedRoute></AppLayout>} />

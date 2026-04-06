@@ -2,11 +2,13 @@ import { useState } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import {
   User, Package, Heart, Bell, LogOut, Settings, ShoppingBag,
-  ChevronRight, Edit3, Save, X, MapPin, Phone, Mail, Camera
+  ChevronRight, Edit3, Save, X, MapPin, Phone, Mail, Camera,
+  Gift, Coins, Copy, Users, TrendingUp, Star, ArrowUpRight, ArrowDownRight
 } from "lucide-react";
 import { useAuthStore } from "@/stores/authStore";
 import { useOrderStore } from "@/stores/orderStore";
 import { useWishlistStore } from "@/stores/wishlistStore";
+import { useReferralStore } from "@/stores/referralStore";
 import { ProductCard } from "@/components/features/ProductCard";
 import { toast } from "sonner";
 
@@ -15,6 +17,7 @@ const SIDEBAR_ITEMS = [
   { id: "orders", label: "Order History", icon: Package },
   { id: "current-orders", label: "Current Orders", icon: ShoppingBag },
   { id: "wishlist", label: "My Wishlist", icon: Heart },
+  { id: "referral", label: "Rewards & Referrals", icon: Gift },
   { id: "notifications", label: "Notifications", icon: Bell },
   { id: "settings", label: "Settings", icon: Settings },
 ];
@@ -40,11 +43,19 @@ export const CustomerDashboard = () => {
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState({ name: user?.name || "", phone: user?.phone || "", address: user?.address || "" });
 
+  const { getPoints, getTransactions, getReferrals, getReferralCode, addReferral } = useReferralStore();
+  const [referralEmail, setReferralEmail] = useState("");
+  const [referralName, setReferralName] = useState("");
+
   if (!user) { navigate("/login"); return null; }
 
   const orders = getOrdersByUser(user.id);
   const currentOrders = orders.filter(o => !["delivered", "cancelled", "returned"].includes(o.status));
   const pastOrders = orders.filter(o => ["delivered", "cancelled", "returned"].includes(o.status));
+  const userPoints = getPoints(user.id);
+  const transactions = getTransactions(user.id);
+  const referrals = getReferrals(user.id);
+  const referralCode = getReferralCode(user.id);
 
   const handleSave = () => {
     updateProfile(form);
@@ -53,6 +64,14 @@ export const CustomerDashboard = () => {
   };
 
   const handleLogout = () => { logout(); navigate("/"); };
+
+  const handleReferralSend = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!referralEmail || !referralName) { toast.error("Please enter name and email"); return; }
+    addReferral(user.id, referralEmail, referralName);
+    setReferralEmail(""); setReferralName("");
+    toast.success(`Referral sent to ${referralName}! You earned 500 points.`);
+  };
 
   const NOTIFICATIONS = [
     { id: "n1", title: "Order Delivered!", message: "Your Royal Persian Medallion carpet has been delivered.", type: "order", time: "2 hours ago", read: false },
@@ -201,6 +220,132 @@ export const CustomerDashboard = () => {
                     </div>
                   ))
                 )}
+              </div>
+            )}
+
+            {/* Referral & Rewards */}
+            {active === "referral" && (
+              <div className="animate-fade-in space-y-6">
+                <h2 className="font-heading text-2xl font-bold">Rewards & Referrals</h2>
+
+                {/* Points Overview */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div className="bg-gradient-to-br from-amber-500 to-amber-600 rounded-2xl p-5 text-white sm:col-span-1">
+                    <div className="flex items-center gap-2 mb-2"><Gift className="w-5 h-5" /><span className="text-sm font-medium opacity-90">Total Points</span></div>
+                    <p className="font-heading text-4xl font-bold">{userPoints.toLocaleString("en-IN")}</p>
+                    <p className="text-xs opacity-80 mt-1">= ₹{Math.floor(userPoints * 0.1).toLocaleString("en-IN")} discount value</p>
+                  </div>
+                  <div className="bg-card border border-border rounded-2xl p-5">
+                    <div className="flex items-center gap-2 mb-2"><Users className="w-4 h-4 text-primary" /><span className="text-sm font-medium text-muted-foreground">Referrals</span></div>
+                    <p className="font-heading text-3xl font-bold text-foreground">{referrals.length}</p>
+                    <p className="text-xs text-muted-foreground mt-1">{referrals.filter(r => r.status === "completed").length} completed</p>
+                  </div>
+                  <div className="bg-card border border-border rounded-2xl p-5">
+                    <div className="flex items-center gap-2 mb-2"><TrendingUp className="w-4 h-4 text-green-600" /><span className="text-sm font-medium text-muted-foreground">Points Earned</span></div>
+                    <p className="font-heading text-3xl font-bold text-foreground">{transactions.filter(t => t.points > 0).reduce((s, t) => s + t.points, 0).toLocaleString()}</p>
+                    <p className="text-xs text-muted-foreground mt-1">All time</p>
+                  </div>
+                </div>
+
+                {/* Referral Code */}
+                <div className="bg-card border border-border rounded-2xl p-5">
+                  <h3 className="font-heading font-semibold mb-1">Your Referral Code</h3>
+                  <p className="text-sm text-muted-foreground mb-4">Share this code with friends. You both get 500 bonus points when they make their first purchase!</p>
+                  <div className="flex items-center gap-3 bg-muted rounded-xl p-3">
+                    <code className="flex-1 font-mono font-bold text-primary text-lg tracking-wider">{referralCode}</code>
+                    <button onClick={() => { navigator.clipboard?.writeText(referralCode); toast.success("Code copied!"); }} className="flex items-center gap-1.5 px-3 py-1.5 bg-primary text-white rounded-lg text-sm hover:bg-primary/90 transition-colors">
+                      <Copy className="w-3.5 h-3.5" /> Copy
+                    </button>
+                  </div>
+                </div>
+
+                {/* Send Referral */}
+                <div className="bg-card border border-border rounded-2xl p-5">
+                  <h3 className="font-heading font-semibold mb-4">Invite a Friend</h3>
+                  <form onSubmit={handleReferralSend} className="space-y-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <input value={referralName} onChange={e => setReferralName(e.target.value)} className="input-field" placeholder="Friend's name" />
+                      <input type="email" value={referralEmail} onChange={e => setReferralEmail(e.target.value)} className="input-field" placeholder="Friend's email" />
+                    </div>
+                    <button type="submit" className="btn-primary text-sm"><Gift className="w-4 h-4" /> Send Invite (+500 pts for you)</button>
+                  </form>
+                </div>
+
+                {/* Points Tiers */}
+                <div className="bg-card border border-border rounded-2xl p-5">
+                  <h3 className="font-heading font-semibold mb-4">How to Earn Points</h3>
+                  <div className="space-y-3">
+                    {[
+                      { icon: ShoppingBag, label: "Make a Purchase", pts: "1 pt per ₹100", color: "bg-blue-100 dark:bg-blue-900/20 text-blue-600" },
+                      { icon: Users, label: "Refer a Friend", pts: "+500 pts", color: "bg-green-100 dark:bg-green-900/20 text-green-600" },
+                      { icon: Star, label: "Write a Review", pts: "+50 pts", color: "bg-amber-100 dark:bg-amber-900/20 text-amber-600" },
+                      { icon: Gift, label: "Welcome Bonus", pts: "+200 pts", color: "bg-purple-100 dark:bg-purple-900/20 text-purple-600" },
+                    ].map(({ icon: Icon, label, pts, color }) => (
+                      <div key={label} className="flex items-center gap-4 p-3 bg-muted rounded-xl">
+                        <div className={`w-9 h-9 rounded-xl ${color} flex items-center justify-center`}><Icon className="w-4 h-4" /></div>
+                        <div className="flex-1"><p className="font-medium text-sm">{label}</p></div>
+                        <span className="font-bold text-primary text-sm">{pts}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Transactions */}
+                <div className="bg-card border border-border rounded-2xl overflow-hidden">
+                  <div className="p-5 border-b border-border">
+                    <h3 className="font-heading font-semibold">Points History</h3>
+                  </div>
+                  <div className="divide-y divide-border">
+                    {transactions.length === 0 ? (
+                      <p className="text-center text-muted-foreground py-8 text-sm">No transactions yet</p>
+                    ) : transactions.slice(0, 8).map(tx => (
+                      <div key={tx.id} className="flex items-center gap-3 px-5 py-3">
+                        <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${tx.points > 0 ? "bg-green-100 dark:bg-green-900/20" : "bg-red-100 dark:bg-red-900/20"}`}>
+                          {tx.points > 0 ? <ArrowUpRight className="w-4 h-4 text-green-600" /> : <ArrowDownRight className="w-4 h-4 text-red-600" />}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-foreground line-clamp-1">{tx.description}</p>
+                          <p className="text-xs text-muted-foreground">{new Date(tx.date).toLocaleDateString("en-IN")}</p>
+                        </div>
+                        <span className={`font-bold text-sm ${tx.points > 0 ? "text-green-600" : "text-red-600"}`}>
+                          {tx.points > 0 ? "+" : ""}{tx.points} pts
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Referrals History */}
+                {referrals.length > 0 && (
+                  <div className="bg-card border border-border rounded-2xl overflow-hidden">
+                    <div className="p-5 border-b border-border"><h3 className="font-heading font-semibold">Referrals Sent ({referrals.length})</h3></div>
+                    <div className="divide-y divide-border">
+                      {referrals.map(r => (
+                        <div key={r.id} className="flex items-center gap-3 px-5 py-3">
+                          <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${r.referredEmail}`} alt="" className="w-8 h-8 rounded-full" />
+                          <div className="flex-1">
+                            <p className="text-sm font-medium">{r.referredName}</p>
+                            <p className="text-xs text-muted-foreground">{r.referredEmail}</p>
+                          </div>
+                          <div className="text-right">
+                            <span className={`badge text-xs ${r.status === "completed" ? "bg-green-100 text-green-700" : "bg-yellow-100 text-yellow-700"}`}>{r.status}</span>
+                            <p className="text-xs text-primary font-medium mt-0.5">+{r.pointsEarned} pts</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Redeem at Checkout reminder */}
+                <div className="bg-primary/5 border border-primary/20 rounded-2xl p-4 flex items-center gap-3">
+                  <Coins className="w-8 h-8 text-primary shrink-0" />
+                  <div className="flex-1">
+                    <p className="font-semibold text-sm">Redeem at Checkout</p>
+                    <p className="text-xs text-muted-foreground">Use your {userPoints} points during checkout to save up to ₹{Math.min(Math.floor(userPoints * 0.1), 200)} on your next order.</p>
+                  </div>
+                  <Link to="/shop" className="btn-primary text-sm py-2 px-3">Shop Now</Link>
+                </div>
               </div>
             )}
 

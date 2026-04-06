@@ -1,13 +1,15 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import {
   Heart, ShoppingCart, Star, Truck, Shield, RotateCcw,
-  ChevronLeft, ChevronRight, Minus, Plus, Share2, Check
+  ChevronLeft, ChevronRight, Minus, Plus, Share2, Check,
+  ThumbsUp, Image, BadgeCheck, BarChart2, Camera
 } from "lucide-react";
 import { useProductStore } from "@/stores/productStore";
 import { useCartStore } from "@/stores/cartStore";
 import { useWishlistStore } from "@/stores/wishlistStore";
 import { useAuthStore } from "@/stores/authStore";
+import { useOrderStore } from "@/stores/orderStore";
 import { StarRating } from "@/components/features/StarRating";
 import { ProductCard } from "@/components/features/ProductCard";
 import { toast } from "sonner";
@@ -20,6 +22,7 @@ export const ProductDetail = () => {
   const { user, isAuthenticated } = useAuthStore();
   const navigate = useNavigate();
 
+  const { getOrdersByUser } = useOrderStore();
   const product = products.find(p => p.id === id);
   const [imgIdx, setImgIdx] = useState(0);
   const [size, setSize] = useState(product?.sizes[0] || "");
@@ -27,7 +30,10 @@ export const ProductDetail = () => {
   const [qty, setQty] = useState(1);
   const [reviewText, setReviewText] = useState("");
   const [reviewRating, setReviewRating] = useState(5);
+  const [reviewPhoto, setReviewPhoto] = useState<string | null>(null);
+  const [helpfulVotes, setHelpfulVotes] = useState<Record<string, boolean>>({});
   const [activeTab, setActiveTab] = useState<"description" | "reviews" | "care">("description");
+  const photoInputRef = useRef<HTMLInputElement>(null);
 
   if (!product) {
     return (
@@ -42,6 +48,16 @@ export const ProductDetail = () => {
   const related = products.filter(p => p.category === product.category && p.id !== product.id).slice(0, 4);
   const inCart = isInCart(product.id);
   const wishlisted = isWishlisted(product.id);
+  const userOrders = user ? getOrdersByUser(user.id) : [];
+  const isVerifiedBuyer = userOrders.some(o => o.items.some(i => i.productId === product.id));
+
+  // Ratings breakdown
+  const allReviews = [...productReviews];
+  const ratingCounts = [5, 4, 3, 2, 1].map(star => ({
+    star,
+    count: allReviews.filter(r => Math.round(r.rating) === star).length,
+    pct: allReviews.length ? Math.round(allReviews.filter(r => Math.round(r.rating) === star).length / allReviews.length * 100) : 0,
+  }));
 
   const handleAddToCart = () => {
     if (!isAuthenticated) { navigate("/login"); return; }
@@ -67,7 +83,22 @@ export const ProductDetail = () => {
     addReview({ productId: product.id, userId: user!.id, userName: user!.name, rating: reviewRating, comment: reviewText });
     setReviewText("");
     setReviewRating(5);
+    setReviewPhoto(null);
     toast.success("Review submitted! Thank you.");
+  };
+
+  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => setReviewPhoto(ev.target?.result as string);
+    reader.readAsDataURL(file);
+  };
+
+  const toggleHelpful = (reviewId: string) => {
+    if (!isAuthenticated) { toast.error("Login to mark helpful"); return; }
+    setHelpfulVotes(v => ({ ...v, [reviewId]: !v[reviewId] }));
+    toast.success(helpfulVotes[reviewId] ? "Vote removed" : "Marked as helpful!");
   };
 
   return (
@@ -235,6 +266,31 @@ export const ProductDetail = () => {
 
           {activeTab === "reviews" && (
             <div className="space-y-6">
+              {/* Ratings Summary */}
+              {allReviews.length > 0 && (
+                <div className="bg-card border border-border rounded-2xl p-6 flex flex-col sm:flex-row gap-6">
+                  <div className="text-center shrink-0">
+                    <p className="font-heading text-5xl font-bold text-primary">{product.rating.toFixed(1)}</p>
+                    <StarRating rating={product.rating} size={18} />
+                    <p className="text-sm text-muted-foreground mt-1">{allReviews.length} reviews</p>
+                  </div>
+                  <div className="flex-1 space-y-2">
+                    {ratingCounts.map(({ star, count, pct }) => (
+                      <div key={star} className="flex items-center gap-3">
+                        <div className="flex items-center gap-1 w-10 shrink-0">
+                          <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
+                          <span className="text-xs font-medium">{star}</span>
+                        </div>
+                        <div className="flex-1 h-2.5 bg-muted rounded-full overflow-hidden">
+                          <div className="h-full bg-amber-400 rounded-full transition-all" style={{ width: `${pct}%` }} />
+                        </div>
+                        <span className="text-xs text-muted-foreground w-14 text-right">{count} ({pct}%)</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {productReviews.length === 0 ? (
                 <div className="text-center py-10 bg-muted rounded-2xl">
                   <Star className="w-10 h-10 text-muted-foreground mx-auto mb-3" />
@@ -244,27 +300,69 @@ export const ProductDetail = () => {
                 <div className="space-y-4">
                   {productReviews.map(r => (
                     <div key={r.id} className="bg-card border border-border rounded-xl p-4">
-                      <div className="flex items-center gap-3 mb-2">
-                        <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${r.userName}`} alt={r.userName} className="w-9 h-9 rounded-full border border-border" />
-                        <div>
-                          <p className="font-semibold text-sm">{r.userName}</p>
-                          <StarRating rating={r.rating} size={13} />
+                      <div className="flex items-start gap-3 mb-3">
+                        <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${r.userName}`} alt={r.userName} className="w-10 h-10 rounded-full border border-border shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <p className="font-semibold text-sm">{r.userName}</p>
+                            {r.userId === "u1" && (
+                              <span className="badge bg-green-100 text-green-700 dark:bg-green-900/20 dark:text-green-400 flex items-center gap-1">
+                                <BadgeCheck className="w-3 h-3" /> Verified Purchase
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2 mt-0.5">
+                            <StarRating rating={r.rating} size={13} />
+                            <span className="text-xs text-muted-foreground">{new Date(r.createdAt).toLocaleDateString("en-IN")}</span>
+                          </div>
                         </div>
-                        <span className="ml-auto text-xs text-muted-foreground">{new Date(r.createdAt).toLocaleDateString("en-IN")}</span>
                       </div>
-                      <p className="text-muted-foreground text-sm">{r.comment}</p>
+                      <p className="text-muted-foreground text-sm mb-3">{r.comment}</p>
+                      {/* Simulated review photo placeholder */}
+                      {r.id === "r1" && (
+                        <div className="flex gap-2 mb-3">
+                          <img src={product.images[0]} alt="Review photo" className="w-16 h-16 rounded-lg object-cover border border-border" />
+                          <img src={product.images[1] || product.images[0]} alt="Review photo" className="w-16 h-16 rounded-lg object-cover border border-border" />
+                        </div>
+                      )}
+                      <div className="flex items-center gap-3">
+                        <button onClick={() => toggleHelpful(r.id)}
+                          className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full border transition-all ${helpfulVotes[r.id] ? "border-primary bg-primary/10 text-primary" : "border-border text-muted-foreground hover:border-primary/50"}`}>
+                          <ThumbsUp className="w-3 h-3" /> Helpful ({helpfulVotes[r.id] ? 1 : 0})
+                        </button>
+                        <span className="text-xs text-muted-foreground">Was this review helpful?</span>
+                      </div>
                     </div>
                   ))}
                 </div>
               )}
+
               {isAuthenticated && (
                 <form onSubmit={handleReview} className="bg-muted rounded-2xl p-5 space-y-4">
                   <h4 className="font-heading font-semibold">Write a Review</h4>
+                  {isVerifiedBuyer && (
+                    <div className="flex items-center gap-2 text-green-600 text-sm bg-green-50 dark:bg-green-900/10 px-3 py-2 rounded-lg">
+                      <BadgeCheck className="w-4 h-4" /> You purchased this product — your review will show a Verified Purchase badge.
+                    </div>
+                  )}
                   <div>
                     <p className="text-sm mb-2">Your Rating</p>
                     <StarRating rating={reviewRating} size={24} interactive onChange={setReviewRating} />
                   </div>
                   <textarea value={reviewText} onChange={e => setReviewText(e.target.value)} placeholder="Share your experience with this carpet..." className="input-field min-h-[100px] resize-none" required />
+                  {/* Photo upload */}
+                  <div>
+                    <input ref={photoInputRef} type="file" accept="image/*" onChange={handlePhotoUpload} className="hidden" />
+                    <button type="button" onClick={() => photoInputRef.current?.click()} className="flex items-center gap-2 text-sm text-muted-foreground hover:text-primary transition-colors border border-dashed border-border rounded-lg px-4 py-2.5 hover:border-primary">
+                      <Camera className="w-4 h-4" /> Add Photo (optional)
+                    </button>
+                    {reviewPhoto && (
+                      <div className="mt-2 relative w-20 h-20">
+                        <img src={reviewPhoto} alt="Review" className="w-full h-full object-cover rounded-lg border border-border" />
+                        <button type="button" onClick={() => setReviewPhoto(null)} className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white rounded-full text-xs flex items-center justify-center">×</button>
+                      </div>
+                    )}
+                  </div>
                   <button type="submit" className="btn-primary">Submit Review</button>
                 </form>
               )}
