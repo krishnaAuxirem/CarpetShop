@@ -1,0 +1,146 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 48 33% 97%;
+    --foreground: 20 14% 20%;
+    --card: 0 0% 100%;
+    --card-foreground: 20 14% 20%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 20 14% 20%;
+    --primary: 25 75% 31%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 48 50% 93%;
+    --secondary-foreground: 20 14% 20%;
+    --muted: 48 30% 92%;
+    --muted-foreground: 20 10% 50%;
+    --accent: 42 75% 52%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 30 20% 88%;
+    --input: 30 20% 88%;
+    --ring: 25 75% 31%;
+    --radius: 0.75rem;
+  }
+
+  .dark {
+    --background: 0 0% 7%;
+    --foreground: 0 0% 88%;
+    --card: 0 0% 10%;
+    --card-foreground: 0 0% 88%;
+    --popover: 0 0% 10%;
+    --popover-foreground: 0 0% 88%;
+    --primary: 25 75% 31%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 0 0% 15%;
+    --secondary-foreground: 0 0% 88%;
+    --muted: 0 0% 15%;
+    --muted-foreground: 0 0% 60%;
+    --accent: 42 75% 52%;
+    --accent-foreground: 0 0% 10%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 0 0% 18%;
+    --input: 0 0% 18%;
+    --ring: 25 75% 31%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+    transition: background-color 0.3s ease, color 0.3s ease;
+  }
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-heading;
+  }
+}
+
+@layer components {
+  .page-header {
+    @apply relative overflow-hidden min-h-[40vh] flex items-center justify-center;
+  }
+  .page-header::after {
+    content: '';
+    @apply absolute inset-0 bg-gradient-to-b from-black/60 to-black/30;
+  }
+  .page-header-content {
+    @apply relative z-10 text-center text-white;
+  }
+  .section-title {
+    @apply font-heading text-3xl md:text-4xl font-bold text-foreground;
+  }
+  .section-subtitle {
+    @apply text-muted-foreground text-lg mt-3;
+  }
+  .btn-primary {
+    @apply bg-primary text-primary-foreground hover:bg-primary/90 px-6 py-3 rounded-lg font-semibold transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 inline-flex items-center gap-2;
+  }
+  .btn-secondary {
+    @apply bg-secondary text-secondary-foreground border border-border hover:bg-muted px-6 py-3 rounded-lg font-semibold transition-all duration-300 hover:shadow-md inline-flex items-center gap-2;
+  }
+  .btn-accent {
+    @apply bg-accent text-accent-foreground hover:bg-accent/90 px-6 py-3 rounded-lg font-semibold transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 inline-flex items-center gap-2;
+  }
+  .card-hover {
+    @apply transition-all duration-300 hover:shadow-xl hover:-translate-y-1;
+  }
+  .glass-card {
+    @apply bg-white/80 dark:bg-white/5 backdrop-blur-md border border-white/30 dark:border-white/10 rounded-2xl;
+  }
+  .skeleton {
+    @apply bg-muted animate-pulse rounded;
+  }
+  .sidebar-link {
+    @apply flex items-center gap-3 px-4 py-3 rounded-lg text-muted-foreground hover:text-primary hover:bg-primary/10 transition-all duration-200 cursor-pointer font-medium;
+  }
+  .sidebar-link.active {
+    @apply text-primary bg-primary/10 font-semibold;
+  }
+  .input-field {
+    @apply w-full px-4 py-3 bg-background border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all duration-200 text-foreground placeholder:text-muted-foreground;
+  }
+  .badge {
+    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold;
+  }
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { @apply bg-muted; }
+::-webkit-scrollbar-thumb { @apply bg-primary/50 rounded-full; }
+::-webkit-scrollbar-thumb:hover { @apply bg-primary; }
+
+/* Smooth scroll */
+html { scroll-behavior: smooth; }
+
+/* Slider transitions */
+.slider-enter { opacity: 0; transform: scale(1.05); }
+.slider-active { opacity: 1; transform: scale(1); transition: opacity 0.8s ease, transform 0.8s ease; }
+.slider-exit { opacity: 0; transform: scale(0.95); }
+
+/* Page transition */
+.page-transition {
+  animation: fade-in 0.4s ease-out;
+}
+
+/* Star rating */
+.star { color: #D4AF37; }
+
+/* Price tag */
+.price-tag {
+  @apply text-primary font-heading font-bold;
+}
+
+/* Loading skeleton */
+.skeleton-shimmer {
+  background: linear-gradient(90deg, transparent 25%, rgba(255,255,255,0.5) 50%, transparent 75%);
+  background-size: 200% 100%;
+  animation: shimmer 2s infinite;
+}
